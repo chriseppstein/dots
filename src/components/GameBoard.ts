@@ -153,7 +153,7 @@ export class GameBoard extends HTMLElement {
       <div class="controls">
         <h3>Controls</h3>
         <div class="control-item">🖱️ Left Click: Draw Line</div>
-        <div class="control-item">🖱️ Drag: Rotate View</div>
+        <div class="control-item">🖱️ Right Drag: Rotate View</div>
         <div class="control-item">🔄 Scroll: Zoom In/Out</div>
         <button id="new-game">New Game</button>
       </div>

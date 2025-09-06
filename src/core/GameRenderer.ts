@@ -100,7 +100,8 @@ export class GameRenderer {
       const deltaX = event.clientX - this.previousMousePosition.x;
       const deltaY = event.clientY - this.previousMousePosition.y;
       
-      if (event.buttons === 1) {
+      // Right mouse button (button 2) or middle button (button 1) for rotation
+      if (event.buttons === 2 || event.buttons === 4) {
         this.gridGroup.rotation.y += deltaX * 0.01;
         this.gridGroup.rotation.x += deltaY * 0.01;
       }
@@ -112,19 +113,27 @@ export class GameRenderer {
   }
 
   private onMouseDown(event: MouseEvent): void {
-    this.isDragging = true;
-    this.previousMousePosition = { x: event.clientX, y: event.clientY };
-    
-    if (event.button === 0 && !event.shiftKey && !event.ctrlKey) {
+    // Left click (button 0) for selecting lines
+    if (event.button === 0) {
       const line = this.getHoveredLine();
       if (line) {
         this.handleLineClick(line);
+        return; // Don't start dragging on left click
       }
+    }
+    
+    // Right click (button 2) or middle click (button 1) for dragging
+    if (event.button === 2 || event.button === 1) {
+      this.isDragging = true;
+      this.previousMousePosition = { x: event.clientX, y: event.clientY };
     }
   }
 
-  private onMouseUp(): void {
-    this.isDragging = false;
+  private onMouseUp(event: MouseEvent): void {
+    // Only stop dragging if it was a right or middle click release
+    if (event.button === 2 || event.button === 1) {
+      this.isDragging = false;
+    }
   }
 
   private onWheel(event: WheelEvent): void {

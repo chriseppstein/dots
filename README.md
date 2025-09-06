@@ -46,8 +46,8 @@ The server runs on port 3001
 
 1. **Setup**: Choose grid size and game mode
 2. **Controls**:
-   - Click on dots to draw lines
-   - Left-drag to rotate the view
+   - Left-click to draw lines between dots
+   - Right-drag to rotate the view
    - Scroll to zoom in/out
 3. **Strategy**: Try to complete squares while avoiding giving your opponent easy opportunities
 
