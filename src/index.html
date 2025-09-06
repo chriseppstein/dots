@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planes - 3D Dots Game</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    
+    #setup-screen {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    
+    #game-screen {
+      display: none;
+      width: 100vw;
+      height: 100vh;
+    }
+    
+    game-setup {
+      max-width: 500px;
+      width: 100%;
+    }
+    
+    game-board {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="setup-screen">
+    <game-setup></game-setup>
+  </div>
+  
+  <div id="game-screen">
+    <game-board></game-board>
+  </div>
+  
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
