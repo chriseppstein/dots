@@ -6,7 +6,10 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "server": "npx tsx server/server.ts"
+    "server": "npx tsx server/server.ts",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
   },
   "keywords": [],
   "author": "",
@@ -16,9 +19,12 @@
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.1",
     "@types/three": "^0.180.0",
+    "@vitest/ui": "^3.2.4",
+    "happy-dom": "^18.0.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vite": "^5.4.19"
+    "vite": "^5.4.19",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "cors": "^2.8.5",

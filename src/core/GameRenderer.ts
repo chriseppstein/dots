@@ -118,7 +118,7 @@ export class GameRenderer {
     if (event.button === 0 && !event.shiftKey && !event.ctrlKey) {
       const line = this.getHoveredLine();
       if (line) {
-        this.onLineClick(line);
+        this.handleLineClick(line);
       }
     }
   }
@@ -161,26 +161,86 @@ export class GameRenderer {
   private getHoveredLine(): Line | null {
     this.raycaster.setFromCamera(this.mouse, this.camera);
     
-    const allDots = this.dots.flat(2);
-    const intersects = this.raycaster.intersectObjects(allDots);
+    // Get all possible lines
+    const possibleLines: { line: Line; distance: number }[] = [];
     
-    if (intersects.length < 2) return null;
+    for (let x = 0; x < this.gridSize; x++) {
+      for (let y = 0; y < this.gridSize; y++) {
+        for (let z = 0; z < this.gridSize; z++) {
+          const point = { x, y, z };
+          
+          // Check horizontal lines (x direction)
+          if (x < this.gridSize - 1) {
+            const line: Line = { start: point, end: { x: x + 1, y, z }, player: null };
+            const distance = this.getLineDistanceFromRay(line);
+            if (distance !== null) {
+              possibleLines.push({ line, distance });
+            }
+          }
+          
+          // Check vertical lines (y direction)
+          if (y < this.gridSize - 1) {
+            const line: Line = { start: point, end: { x, y: y + 1, z }, player: null };
+            const distance = this.getLineDistanceFromRay(line);
+            if (distance !== null) {
+              possibleLines.push({ line, distance });
+            }
+          }
+          
+          // Check depth lines (z direction)
+          if (z < this.gridSize - 1) {
+            const line: Line = { start: point, end: { x, y, z: z + 1 }, player: null };
+            const distance = this.getLineDistanceFromRay(line);
+            if (distance !== null) {
+              possibleLines.push({ line, distance });
+            }
+          }
+        }
+      }
+    }
     
-    const dot1 = intersects[0].object;
-    const dot2 = intersects[1].object;
+    // Find the closest line
+    if (possibleLines.length === 0) return null;
     
-    const p1 = dot1.userData as Point3D;
-    const p2 = dot2.userData as Point3D;
+    possibleLines.sort((a, b) => a.distance - b.distance);
     
-    const dx = Math.abs(p2.x - p1.x);
-    const dy = Math.abs(p2.y - p1.y);
-    const dz = Math.abs(p2.z - p1.z);
-    
-    if (dx + dy + dz === 1) {
-      return { start: p1, end: p2, player: null };
+    // Return the closest line if it's within a reasonable distance
+    if (possibleLines[0].distance < 0.5) {
+      return possibleLines[0].line;
     }
     
     return null;
+  }
+  
+  private getLineDistanceFromRay(line: Line): number | null {
+    const offset = (this.gridSize - 1) / 2;
+    
+    // Convert line endpoints to world space
+    const start = new THREE.Vector3(
+      line.start.x - offset,
+      line.start.y - offset,
+      line.start.z - offset
+    );
+    const end = new THREE.Vector3(
+      line.end.x - offset,
+      line.end.y - offset,
+      line.end.z - offset
+    );
+    
+    // Get the midpoint of the line
+    const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+    
+    // Transform midpoint to world coordinates
+    const worldMidpoint = midpoint.clone();
+    worldMidpoint.applyMatrix4(this.gridGroup.matrixWorld);
+    
+    // Create a ray from camera through mouse position
+    const ray = this.raycaster.ray;
+    
+    // Calculate distance from ray to midpoint
+    const distance = ray.distanceToPoint(worldMidpoint);
+    
+    return distance;
   }
 
   private createLineMesh(line: Line, color: number, opacity: number = 1): THREE.Mesh {
@@ -233,7 +293,7 @@ export class GameRenderer {
     return `${points[0].x},${points[0].y},${points[0].z}-${points[1].x},${points[1].y},${points[1].z}`;
   }
 
-  private onLineClick(line: Line): void {
+  private handleLineClick(line: Line): void {
     if (this.lineClickCallback && !this.isLineDrawn(line)) {
       this.lineClickCallback(line.start, line.end);
     }
