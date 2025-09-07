@@ -94,12 +94,31 @@ io.on('connection', (socket) => {
       
       const players = Array.from(room.players.values());
       const gameState = room.gameEngine.getState();
-      gameState.players[0].name = players[0].name;
-      gameState.players[0].id = players[0].id;
-      gameState.players[1].name = players[1].name;
-      gameState.players[1].id = players[1].id;
       
-      io.to(roomId).emit('game-started', gameState);
+      // Update player names in the engine
+      gameState.players[0].name = players[0].name;
+      gameState.players[1].name = players[1].name;
+      
+      // Create a deep copy for clients with socket IDs for UI identification
+      const stateForClients = JSON.parse(JSON.stringify(gameState));
+      stateForClients.players[0].id = players[0].id;
+      stateForClients.players[1].id = players[1].id;
+      // Current player uses socket ID for client-side turn validation
+      stateForClients.currentPlayer = { ...gameState.currentPlayer, id: players[0].id };
+      
+      console.log(`🎯 GAME STARTED - INITIAL STATE DEBUG 🎯`);
+      console.log('=== GAME START DEBUG INFO ===');
+      console.log('Engine current player:', JSON.stringify(gameState.currentPlayer, null, 2));
+      console.log('State for clients current player:', JSON.stringify(stateForClients.currentPlayer, null, 2));
+      console.log('Players mapping:');
+      players.forEach((p, idx) => {
+        console.log(`  Player ${idx}: ${p.name} (socket: ${p.socketId})`);
+      });
+      console.log('State for clients players:', JSON.stringify(stateForClients.players, null, 2));
+      console.log('Turn:', stateForClients.turn);
+      console.log('=== END GAME START DEBUG ===');
+      
+      io.to(roomId).emit('game-started', stateForClients);
       console.log(`Game started in room ${roomId}`);
     } else {
       const players = Array.from(room.players.values());
@@ -116,31 +135,79 @@ io.on('connection', (socket) => {
   });
 
   socket.on('make-move', ({ roomId, playerId, start, end }: { roomId: string; playerId: string; start: Point3D; end: Point3D }) => {
+    console.log(`Move received from ${socket.id} in room ${roomId}:`, { start, end });
     const room = rooms.get(roomId);
     
     if (!room || !room.gameEngine) {
+      console.log('Error: Game not found');
       socket.emit('error', 'Game not found');
       return;
     }
     
     const gameState = room.gameEngine.getState();
     
-    if (gameState.currentPlayer.id !== playerId) {
+    // Get player info
+    const players = Array.from(room.players.values());
+    const playerIndex = players.findIndex(p => p.socketId === socket.id);
+    
+    if (playerIndex === -1) {
+      console.log('Error: Player not in room');
+      socket.emit('error', 'Player not in room');
+      return;
+    }
+    
+    // The game engine uses 'player1' and 'player2' internally
+    const gamePlayerId = playerIndex === 0 ? 'player1' : 'player2';
+    
+    console.log(`Player ${gamePlayerId} (socket: ${socket.id}) attempting move. Current player in engine: ${gameState.currentPlayer.id}`);
+    
+    // Check if it's this player's turn (compare game engine IDs)
+    if (gameState.currentPlayer.id !== gamePlayerId) {
+      console.log('🚨 SERVER: NOT PLAYER TURN 🚨');
+      console.log('=== SERVER SIDE DEBUG INFO ===');
+      console.log('Socket ID:', socket.id);
+      console.log('Player Index:', playerIndex);
+      console.log('Game Player ID (derived):', gamePlayerId);
+      console.log('Game Player ID type:', typeof gamePlayerId);
+      console.log('Current Player ID from engine:', gameState.currentPlayer.id);
+      console.log('Current Player ID type:', typeof gameState.currentPlayer.id);
+      console.log('Are they equal?', gameState.currentPlayer.id === gamePlayerId);
+      console.log('Full current player from engine:', JSON.stringify(gameState.currentPlayer, null, 2));
+      console.log('All players from engine:', JSON.stringify(gameState.players, null, 2));
+      console.log('Engine turn:', gameState.turn);
+      console.log('Room players mapping:');
+      players.forEach((p, idx) => {
+        console.log(`  Player ${idx}: ${p.name} (socket: ${p.socketId})`);
+      });
+      console.log('=== END SERVER DEBUG ===');
       socket.emit('error', 'Not your turn');
       return;
     }
     
     const success = room.gameEngine.makeMove(start, end);
+    console.log(`Move result: ${success ? 'success' : 'failed'}`);
     
     if (success) {
       const updatedState = room.gameEngine.getState();
-      io.to(roomId).emit('game-state-update', updatedState);
+      
+      // Create a deep copy for clients with socket IDs for UI identification
+      const stateForClients = JSON.parse(JSON.stringify(updatedState));
+      stateForClients.players[0].id = players[0].id;
+      stateForClients.players[1].id = players[1].id;
+      // Map current player to socket ID
+      stateForClients.currentPlayer = updatedState.currentPlayer.id === 'player1' 
+        ? { ...updatedState.currentPlayer, id: players[0].id }
+        : { ...updatedState.currentPlayer, id: players[1].id };
+      
+      console.log(`Broadcasting game-state-update to room ${roomId}. Turn: ${updatedState.turn}, Current player: ${updatedState.currentPlayer.id}`);
+      io.to(roomId).emit('game-state-update', stateForClients);
       
       if (updatedState.winner) {
         console.log(`Game ended in room ${roomId}. Winner: ${updatedState.winner.name}`);
         rooms.delete(roomId);
       }
     } else {
+      console.log('Error: Invalid move');
       socket.emit('error', 'Invalid move');
     }
   });

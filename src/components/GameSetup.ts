@@ -549,22 +549,63 @@ export class GameSetup extends HTMLElement {
     const existingToken = tokens.find(t => t.roomId === roomId);
     
     if (existingToken) {
-      // Rejoin existing game
+      // Check if the game has actually started by getting room info first
       try {
         this.networkManager = new NetworkManager();
         await this.networkManager.connect();
-        this.networkManager.joinRoom(roomId, existingToken.playerName);
         
-        this.dispatchEvent(new CustomEvent('gamestart', {
-          detail: {
-            gridSize: 4, // Will be updated by server
-            gameMode: 'online' as GameMode,
-            player1Name: existingToken.playerName,
-            player2Name: 'Opponent',
-            networkManager: this.networkManager,
-            rejoining: true
-          }
-        }));
+        // Get room info to check if game has started
+        const roomInfo = await this.networkManager.getRoomInfo(roomId);
+        
+        if (roomInfo.playersCount === 1) {
+          // Room creator returning to their own room - show waiting room
+          console.log('Room creator returning to waiting room');
+          
+          // Set up the network manager with existing event handlers for waiting room
+          this.networkManager.on('player-joined', (data: { playerId: string, playerName: string }) => {
+            console.log('Player joined:', data);
+            // This is received by player 1 when player 2 joins
+            // But we don't start the game yet - wait for game-started event
+          });
+          
+          this.networkManager.on('game-started', (gameState: any) => {
+            console.log('Game started:', gameState);
+            // Both players receive this when the game starts
+            this.dispatchEvent(new CustomEvent('gamestart', {
+              detail: {
+                gridSize: this.selectedGridSize || gameState.gridSize || 4,
+                gameMode: 'online' as GameMode,
+                player1Name: gameState.players[0].name,
+                player2Name: gameState.players[1].name,
+                networkManager: this.networkManager,
+                gameState: gameState
+              }
+            }));
+          });
+          
+          // Generate shareable URL
+          this.gameRoomUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+          
+          // Show waiting room
+          this.currentStep = 'waiting-room';
+          this.render();
+          this.setupEventListeners();
+          
+        } else {
+          // Game has multiple players - rejoin existing game
+          this.networkManager.joinRoom(roomId, existingToken.playerName);
+          
+          this.dispatchEvent(new CustomEvent('gamestart', {
+            detail: {
+              gridSize: roomInfo.gridSize || 4,
+              gameMode: 'online' as GameMode,
+              player1Name: existingToken.playerName,
+              player2Name: 'Opponent',
+              networkManager: this.networkManager,
+              rejoining: true
+            }
+          }));
+        }
       } catch (error) {
         console.error('Failed to rejoin game:', error);
         this.showJoinFormWithRoomInfo(roomId);

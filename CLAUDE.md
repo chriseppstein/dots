@@ -110,3 +110,8 @@ server/
 ```
 
 Vite serves from `src/` directory, builds to `dist/`. Server runs independently for online multiplayer.
+
+## Development Guidelines
+
+### Server Restart Rule
+**IMPORTANT**: Always restart the server (`npm run server`) after making changes to `server/server.ts`. The server maintains in-memory state for active game rooms, and old state can interfere with testing new code changes.
