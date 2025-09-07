@@ -8,7 +8,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: ["http://localhost:3000", "http://localhost:3001"],
     methods: ["GET", "POST"]
   }
 });
@@ -49,6 +49,28 @@ io.on('connection', (socket) => {
     console.log(`Room ${roomId} created by ${playerName}`);
   });
 
+  socket.on('get-room-info', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    
+    if (!room) {
+      socket.emit('room-info-error', 'Room not found');
+      return;
+    }
+    
+    if (room.players.size >= 2) {
+      socket.emit('room-info-error', 'Room is full');
+      return;
+    }
+    
+    const player1 = Array.from(room.players.values())[0];
+    socket.emit('room-info', {
+      roomId,
+      player1Name: player1?.name || 'Player 1',
+      gridSize: room.gridSize,
+      playersCount: room.players.size
+    });
+  });
+
   socket.on('join-room', ({ roomId, playerName }) => {
     const room = rooms.get(roomId);
     
@@ -80,7 +102,15 @@ io.on('connection', (socket) => {
       io.to(roomId).emit('game-started', gameState);
       console.log(`Game started in room ${roomId}`);
     } else {
-      socket.emit('room-joined', { roomId, playerId, gameState: null });
+      const players = Array.from(room.players.values());
+      const player1Name = players[0]?.name || 'Player 1';
+      
+      socket.emit('room-joined', { 
+        roomId, 
+        playerId, 
+        gameState: null,
+        player1Name: player1Name
+      });
       socket.to(roomId).emit('player-joined', { playerId, playerName });
     }
   });
@@ -147,7 +177,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

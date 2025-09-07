@@ -2,12 +2,14 @@ import { GameEngine } from '../core/GameEngine';
 import { GameRenderer } from '../core/GameRenderer';
 import { GridSize, GameMode, Point3D } from '../core/types';
 import { AIPlayer } from '../ai/AIPlayer';
+import { NetworkManager } from '../network/NetworkManager';
 
 export class GameBoard extends HTMLElement {
   private engine?: GameEngine;
   private renderer?: GameRenderer;
   private renderContainer?: HTMLDivElement;
   private aiPlayer?: AIPlayer;
+  private networkManager?: NetworkManager;
 
   constructor() {
     super();
@@ -170,13 +172,14 @@ export class GameBoard extends HTMLElement {
     this.renderContainer = this.shadowRoot.querySelector('#render-container') as HTMLDivElement;
   }
 
-  public startGame(gridSize: GridSize, gameMode: GameMode, player1Name: string, player2Name: string) {
+  public startGame(gridSize: GridSize, gameMode: GameMode, player1Name: string, player2Name: string, networkManager?: NetworkManager, gameState?: any) {
     if (!this.renderContainer) return;
     
     if (this.renderer) {
       this.renderer.dispose();
     }
     
+    this.networkManager = networkManager;
     this.engine = new GameEngine(gridSize, gameMode);
     this.renderer = new GameRenderer(this.renderContainer, gridSize);
     
@@ -188,6 +191,11 @@ export class GameBoard extends HTMLElement {
     state.players[0].name = player1Name;
     state.players[1].name = player2Name;
     
+    // If we have an existing game state (rejoining), restore it
+    if (gameState) {
+      // TODO: Restore game state from server
+    }
+    
     this.updateHUD();
     
     this.renderer.onLineClick((start: Point3D, end: Point3D) => {
@@ -198,9 +206,19 @@ export class GameBoard extends HTMLElement {
       
       if (state.gameMode === 'ai' && state.currentPlayer.isAI) return;
       
+      // For online games, check if it's this player's turn
+      if (gameMode === 'online' && this.networkManager) {
+        // TODO: Add proper turn validation for online play
+      }
+      
       const success = this.engine.makeMove(start, end);
       
       if (success) {
+        // Send move to server for online games
+        if (gameMode === 'online' && this.networkManager) {
+          this.networkManager.makeMove(start, end);
+        }
+        
         this.updateGame();
         
         if (state.gameMode === 'ai' && !state.winner) {
@@ -208,6 +226,11 @@ export class GameBoard extends HTMLElement {
         }
       }
     });
+    
+    // Set up network event listeners for online games
+    if (gameMode === 'online' && this.networkManager) {
+      this.setupNetworkListeners();
+    }
     
     if (this.shadowRoot) {
       const newGameButton = this.shadowRoot.querySelector('#new-game');
@@ -217,6 +240,35 @@ export class GameBoard extends HTMLElement {
         });
       }
     }
+  }
+  
+  private setupNetworkListeners() {
+    if (!this.networkManager) return;
+    
+    this.networkManager.on('move-made', (move: any) => {
+      if (this.engine) {
+        this.engine.makeMove(move.start, move.end);
+        this.updateGame();
+      }
+    });
+    
+    this.networkManager.on('game-state-update', (gameState: any) => {
+      // Update local game state with server state
+      if (this.renderer) {
+        this.renderer.updateFromGameState(gameState);
+        this.updateHUD();
+      }
+    });
+    
+    this.networkManager.on('player-left', () => {
+      alert('Your opponent has left the game.');
+      this.dispatchEvent(new CustomEvent('newgame'));
+    });
+    
+    this.networkManager.on('disconnected', () => {
+      alert('Connection lost. Please rejoin the game.');
+      this.dispatchEvent(new CustomEvent('newgame'));
+    });
   }
 
   private makeAIMove() {

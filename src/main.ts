@@ -20,8 +20,8 @@ class PlanesApp {
     
     if (gameSetup) {
       gameSetup.addEventListener('gamestart', (event: any) => {
-        const { gridSize, gameMode, player1Name, player2Name } = event.detail;
-        this.startGame(gridSize, gameMode, player1Name, player2Name);
+        const { gridSize, gameMode, player1Name, player2Name, networkManager, gameState } = event.detail;
+        this.startGame(gridSize, gameMode, player1Name, player2Name, networkManager, gameState);
       });
     }
     
@@ -32,11 +32,11 @@ class PlanesApp {
     }
   }
 
-  private startGame(gridSize: GridSize, gameMode: GameMode, player1Name: string, player2Name: string) {
+  private startGame(gridSize: GridSize, gameMode: GameMode, player1Name: string, player2Name: string, networkManager?: any, gameState?: any) {
     this.setupScreen.style.display = 'none';
     this.gameScreen.style.display = 'block';
     
-    this.gameBoard.startGame(gridSize, gameMode, player1Name, player2Name);
+    this.gameBoard.startGame(gridSize, gameMode, player1Name, player2Name, networkManager, gameState);
   }
 
   private showSetupScreen() {

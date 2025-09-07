@@ -13,7 +13,7 @@ export class NetworkManager {
   private playerId: string | null = null;
   private callbacks: Map<string, Function> = new Map();
 
-  constructor(serverUrl: string = 'http://localhost:3001') {
+  constructor(serverUrl: string = 'http://localhost:3002') {
     this.socket = io(serverUrl, {
       autoConnect: false
     });
@@ -103,6 +103,32 @@ export class NetworkManager {
     this.socket.emit('create-room', {
       playerName,
       gridSize
+    });
+  }
+
+  public getRoomInfo(roomId: string): Promise<{ roomId: string, player1Name: string, gridSize: any, playersCount: number }> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        reject('Socket not initialized');
+        return;
+      }
+
+      const handleRoomInfo = (info: any) => {
+        this.socket?.off('room-info', handleRoomInfo);
+        this.socket?.off('room-info-error', handleError);
+        resolve(info);
+      };
+
+      const handleError = (error: string) => {
+        this.socket?.off('room-info', handleRoomInfo);
+        this.socket?.off('room-info-error', handleError);
+        reject(error);
+      };
+
+      this.socket.once('room-info', handleRoomInfo);
+      this.socket.once('room-info-error', handleError);
+
+      this.socket.emit('get-room-info', { roomId });
     });
   }
 
