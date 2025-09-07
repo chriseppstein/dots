@@ -6,10 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Development:**
 ```bash
-npm run dev          # Start dev server on localhost:3000
-npm run server       # Start WebSocket server on port 3001 (for online multiplayer)
+npm run dev          # Start dev server (auto-selects port, usually 3000 or 3001)
+npm run server       # Start WebSocket server on port 3002 (for online multiplayer)
 npm run build        # Build for production
 ```
+
+**Important:** For online multiplayer, both servers must be running:
+1. `npm run dev` (game client)
+2. `npm run server` (WebSocket backend)
 
 **Testing:**
 ```bash
@@ -39,10 +43,23 @@ Three.js-based renderer with:
 - Configurable square opacity via `setSquareOpacity()`
 
 ### Game State Flow
-1. `GameSetup` → emits 'gamestart' event
-2. `GameBoard` orchestrates `GameEngine` + `GameRenderer`
-3. `GameEngine.makeMove()` validates lines and updates state
-4. `GameRenderer.updateFromGameState()` syncs visuals
+
+**Mode Selection → Game Setup → Game Start:**
+1. `GameSetup` component shows three-step flow:
+   - Mode selection (Local/Single Player/Online)
+   - Game setup (grid size, player names)
+   - Waiting room (online only)
+2. `GameSetup` → emits 'gamestart' event with NetworkManager (for online)
+3. `GameBoard` orchestrates `GameEngine` + `GameRenderer` + `NetworkManager`
+4. `GameEngine.makeMove()` validates lines and updates state
+5. `GameRenderer.updateFromGameState()` syncs visuals
+
+**Online Multiplayer Flow:**
+1. Player 1 creates room → gets shareable URL (`?room=ROOMID`)
+2. Player 2 visits URL → sees invitation with Player 1's name
+3. Player 2 joins → both receive 'game-started' event
+4. Moves sync via WebSocket through `NetworkManager`
+5. Token-based reconnection stored in localStorage
 
 ### Component Architecture
 Web Components with custom events:
@@ -63,6 +80,14 @@ Adjacent cubes share faces. The `countUniqueFacesForPlayer()` method uses corner
 - `'local'`: Two players on same device
 - `'ai'`: vs computer opponent (see `src/ai/AIPlayer.ts`)
 - `'online'`: multiplayer via WebSocket (`src/network/NetworkManager.ts`)
+
+**Online Multiplayer Architecture:**
+- `NetworkManager`: Handles WebSocket connection and event management
+- Room-based system with unique room IDs
+- `get-room-info` endpoint for invitation display
+- Token-based reconnection stored in localStorage
+- Event cleanup via `cleanupNetworkManager()` to prevent duplicates
+- Server runs on port 3002, client on 3000/3001
 
 **Testing Strategy:**
 - Comprehensive test coverage for game logic, line validation, scoring
