@@ -15,6 +15,10 @@ export class GameRenderer {
   private gridSize: GridSize;
   private isDragging = false;
   private previousMousePosition = { x: 0, y: 0 };
+  private completedSquares: THREE.Mesh[] = [];
+  private cubeSpheres: THREE.Mesh[] = [];
+  private squareOpacity = 0.5; // Configurable opacity for squares
+  private lastState: GameState | null = null;
 
   constructor(container: HTMLElement, gridSize: GridSize = 4) {
     this.container = container;
@@ -315,11 +319,28 @@ export class GameRenderer {
   }
 
   public updateFromGameState(state: GameState): void {
+    // Store the state for potential re-rendering
+    this.lastState = state;
+    
+    // Clear existing lines
     for (const [key, mesh] of this.drawnLines) {
       this.gridGroup.remove(mesh);
     }
     this.drawnLines.clear();
     
+    // Clear existing squares
+    for (const square of this.completedSquares) {
+      this.gridGroup.remove(square);
+    }
+    this.completedSquares = [];
+    
+    // Clear existing cube spheres
+    for (const sphere of this.cubeSpheres) {
+      this.gridGroup.remove(sphere);
+    }
+    this.cubeSpheres = [];
+    
+    // Draw lines
     for (const line of state.lines) {
       const color = line.player?.color ? parseInt(line.player.color.replace('#', '0x')) : 0xffffff;
       const mesh = this.createLineMesh(line, color);
@@ -328,30 +349,108 @@ export class GameRenderer {
       this.gridGroup.add(mesh);
     }
     
+    // Draw completed squares
+    for (const cube of state.cubes) {
+      for (const face of cube.faces) {
+        if (face.player) {
+          this.drawCompletedSquare(face.corners, face.player.color);
+        }
+      }
+    }
+    
+    // Draw cube ownership spheres
     for (const cube of state.cubes) {
       if (cube.owner) {
-        this.highlightCube(cube.position, cube.owner.color);
+        // Owned cube - use owner's color
+        this.drawCubeSphere(cube.position, cube.owner.color);
+      } else if (cube.claimedFaces === 6) {
+        // All faces claimed but tied (3-3) - use gray
+        this.drawCubeSphere(cube.position, '#808080');
       }
     }
   }
 
-  private highlightCube(position: Point3D, color: string): void {
+  private drawCompletedSquare(corners: Point3D[], color: string): void {
     const offset = (this.gridSize - 1) / 2;
-    const geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+    
+    // Calculate the center and normal of the square
+    const v1 = new THREE.Vector3(
+      corners[0].x - offset,
+      corners[0].y - offset,
+      corners[0].z - offset
+    );
+    const v2 = new THREE.Vector3(
+      corners[1].x - offset,
+      corners[1].y - offset,
+      corners[1].z - offset
+    );
+    const v3 = new THREE.Vector3(
+      corners[2].x - offset,
+      corners[2].y - offset,
+      corners[2].z - offset
+    );
+    const v4 = new THREE.Vector3(
+      corners[3].x - offset,
+      corners[3].y - offset,
+      corners[3].z - offset
+    );
+    
+    // Create a plane geometry for the square
+    const geometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array([
+      v1.x, v1.y, v1.z,
+      v2.x, v2.y, v2.z,
+      v3.x, v3.y, v3.z,
+      v4.x, v4.y, v4.z
+    ]);
+    
+    const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+    geometry.computeVertexNormals();
+    
     const material = new THREE.MeshPhongMaterial({
       color: parseInt(color.replace('#', '0x')),
-      opacity: 0.3,
-      transparent: true
+      opacity: this.squareOpacity,
+      transparent: true,
+      side: THREE.DoubleSide
     });
     
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(
+    this.completedSquares.push(mesh);
+    this.gridGroup.add(mesh);
+  }
+  
+  private drawCubeSphere(position: Point3D, color: string): void {
+    const offset = (this.gridSize - 1) / 2;
+    
+    // Create a sphere in the center of the cube
+    const geometry = new THREE.SphereGeometry(0.3, 16, 16);
+    const material = new THREE.MeshPhongMaterial({
+      color: parseInt(color.replace('#', '0x')),
+      opacity: 0.9,
+      transparent: true
+    });
+    
+    const sphere = new THREE.Mesh(geometry, material);
+    sphere.position.set(
       position.x - offset + 0.5,
       position.y - offset + 0.5,
       position.z - offset + 0.5
     );
     
-    this.gridGroup.add(mesh);
+    this.cubeSpheres.push(sphere);
+    this.gridGroup.add(sphere);
+  }
+  
+  // Method to adjust square opacity if needed
+  public setSquareOpacity(opacity: number): void {
+    this.squareOpacity = Math.max(0, Math.min(1, opacity));
+    // Re-render with new opacity
+    if (this.lastState) {
+      this.updateFromGameState(this.lastState);
+    }
   }
 
   private animate(): void {
@@ -369,6 +468,9 @@ export class GameRenderer {
     this.dots = [];
     this.drawnLines.clear();
     this.previewLine = null;
+    this.completedSquares = [];
+    this.cubeSpheres = [];
+    this.lastState = null;
     
     this.createGrid();
     this.setupCamera();

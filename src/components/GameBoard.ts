@@ -60,6 +60,12 @@ export class GameBoard extends HTMLElement {
           font-size: 1.5rem;
         }
         
+        .player-squares {
+          font-size: 0.9rem;
+          opacity: 0.8;
+          margin-top: 0.25rem;
+        }
+        
         .current-turn {
           padding: 0.5rem;
           background: rgba(255, 255, 255, 0.1);
@@ -143,10 +149,12 @@ export class GameBoard extends HTMLElement {
         <div class="player-info">
           <div class="player-name" id="player1-name" style="color: #ff0000;">Player 1</div>
           <div class="player-score" id="player1-score">0</div>
+          <div class="player-squares" id="player1-squares">Squares: 0</div>
         </div>
         <div class="player-info">
           <div class="player-name" id="player2-name" style="color: #0000ff;">Player 2</div>
           <div class="player-score" id="player2-score">0</div>
+          <div class="player-squares" id="player2-squares">Squares: 0</div>
         </div>
       </div>
       
@@ -249,16 +257,20 @@ export class GameBoard extends HTMLElement {
     
     const player1Name = this.shadowRoot.querySelector('#player1-name');
     const player1Score = this.shadowRoot.querySelector('#player1-score');
-    if (player1Name && player1Score) {
+    const player1Squares = this.shadowRoot.querySelector('#player1-squares');
+    if (player1Name && player1Score && player1Squares) {
       player1Name.textContent = state.players[0].name;
       player1Score.textContent = state.players[0].score.toString();
+      player1Squares.textContent = `Squares: ${state.players[0].squareCount || 0}`;
     }
     
     const player2Name = this.shadowRoot.querySelector('#player2-name');
     const player2Score = this.shadowRoot.querySelector('#player2-score');
-    if (player2Name && player2Score) {
+    const player2Squares = this.shadowRoot.querySelector('#player2-squares');
+    if (player2Name && player2Score && player2Squares) {
       player2Name.textContent = state.players[1].name;
       player2Score.textContent = state.players[1].score.toString();
+      player2Squares.textContent = `Squares: ${state.players[1].squareCount || 0}`;
     }
   }
 
@@ -274,8 +286,8 @@ export class GameBoard extends HTMLElement {
       <h2>🎉 Game Over! 🎉</h2>
       <div class="winner-name">${state.winner.name} Wins!</div>
       <div class="final-scores">
-        <div>${state.players[0].name}: ${state.players[0].score}</div>
-        <div>${state.players[1].name}: ${state.players[1].score}</div>
+        <div>${state.players[0].name}: ${state.players[0].score} cubes, ${state.players[0].squareCount || 0} squares</div>
+        <div>${state.players[1].name}: ${state.players[1].score} cubes, ${state.players[1].squareCount || 0} squares</div>
       </div>
       <button onclick="this.parentElement.remove()">Close</button>
     `;

@@ -30,6 +30,7 @@ export interface Player {
   name: string;
   color: string;
   score: number;
+  squareCount: number;
   isAI?: boolean;
 }
 

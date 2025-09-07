@@ -16,7 +16,8 @@ export class GameEngine {
       id: 'player1',
       name: 'Player 1',
       color: '#FF0000',
-      score: 0
+      score: 0,
+      squareCount: 0
     };
 
     const player2: Player = {
@@ -24,6 +25,7 @@ export class GameEngine {
       name: gameMode === 'ai' ? 'AI' : 'Player 2',
       color: '#0000FF',
       score: 0,
+      squareCount: 0,
       isAI: gameMode === 'ai'
     };
 
@@ -252,10 +254,33 @@ export class GameEngine {
 
   private updateScores(): void {
     for (const player of this.state.players) {
+      // Update cube score
       player.score = this.state.cubes.filter(cube => 
         cube.owner?.id === player.id
       ).length;
+      
+      // Update square count using unique face tracking
+      player.squareCount = this.countUniqueFacesForPlayer(player.id);
     }
+  }
+  
+  private countUniqueFacesForPlayer(playerId: string): number {
+    const uniqueFaces = new Set<string>();
+    
+    for (const cube of this.state.cubes) {
+      for (const face of cube.faces) {
+        if (face.player?.id === playerId) {
+          // Create a unique key for this face based on its corners
+          const faceKey = face.corners
+            .map(corner => `${corner.x},${corner.y},${corner.z}`)
+            .sort()
+            .join('|');
+          uniqueFaces.add(faceKey);
+        }
+      }
+    }
+    
+    return uniqueFaces.size;
   }
 
   private switchPlayer(): void {
