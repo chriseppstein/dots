@@ -25,7 +25,7 @@ vitest [pattern]     # Run specific test files matching pattern
 
 ## Core Architecture
 
-**Planes** is a 3D version of Dots and Boxes where players compete to claim cubes by capturing their faces.
+**Cubes** is a 3D version of Dots and Boxes where players compete to claim cubes by capturing their faces.
 
 ### Game Engine (`src/core/GameEngine.ts`)
 Central game logic handling:

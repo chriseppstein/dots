@@ -1,4 +1,4 @@
-# Planes - 3D Dots Game
+# Cubes - 3D Dots Game
 
 A three-dimensional version of the classic Dots and Boxes game where players compete to claim cubes by capturing their faces.
 

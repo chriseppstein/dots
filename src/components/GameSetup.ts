@@ -75,7 +75,7 @@ export class GameSetup extends HTMLElement {
         :host {
           display: block;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          padding: 2rem;
+          padding: 2rem !important;
           border-radius: 12px;
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
           color: white;
@@ -195,7 +195,7 @@ export class GameSetup extends HTMLElement {
         
         .waiting-message {
           text-align: center;
-          padding: 2rem;
+          padding: 2rem !important;
           font-size: 1.1rem;
           opacity: 0.9;
         }
@@ -309,7 +309,7 @@ export class GameSetup extends HTMLElement {
         :host {
           display: block;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          padding: 2rem;
+          padding: 2rem !important;
           border-radius: 12px;
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
           color: white;
@@ -324,7 +324,7 @@ export class GameSetup extends HTMLElement {
         
         .joining-message {
           text-align: center;
-          padding: 2rem;
+          padding: 2rem !important;
           font-size: 1.1rem;
           opacity: 0.9;
         }
@@ -649,7 +649,7 @@ export class GameSetup extends HTMLElement {
         :host {
           display: block;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          padding: 2rem;
+          padding: 2rem !important;
           border-radius: 12px;
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
           color: white;
@@ -751,12 +751,126 @@ export class GameSetup extends HTMLElement {
           font-weight: 600;
           transition: all 0.3s ease;
         }
+        
+        .how-to-play {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 8px;
+          padding: 1.5rem;
+          margin: 1.5rem 0;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .how-to-play h3 {
+          margin-top: 0;
+          margin-bottom: 1rem;
+          font-size: 1.2rem;
+          color: #f5576c;
+        }
+        
+        .how-to-play-content {
+          font-size: 0.95rem;
+          line-height: 1.6;
+          color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .how-to-play ul {
+          margin: 0.5rem 0;
+          padding-left: 1.5rem;
+        }
+        
+        .how-to-play li {
+          margin: 0.5rem 0;
+        }
+        
+        .controls-section {
+          margin-top: 1rem;
+          padding-top: 1rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .controls-section h4 {
+          margin: 0 0 0.5rem 0;
+          font-size: 1rem;
+          color: #f093fb;
+        }
+        
+        .control-item {
+          display: flex;
+          align-items: center;
+          margin: 0.3rem 0;
+          font-size: 0.9rem;
+        }
+        
+        .control-icon {
+          margin-right: 0.5rem;
+          font-size: 1.1rem;
+        }
+        
+        .dialog-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.8);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+          backdrop-filter: blur(5px);
+        }
+        
+        .dialog-content {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border-radius: 12px;
+          padding: 2rem !important;
+          max-width: 600px;
+          max-height: 80vh;
+          overflow-y: auto;
+          position: relative;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        
+        .close-dialog {
+          position: absolute;
+          top: 1rem;
+          right: 1rem;
+          background: rgba(255, 255, 255, 0.2);
+          border: none;
+          color: white;
+          font-size: 1.5rem;
+          width: 2.5rem;
+          height: 2.5rem;
+          border-radius: 50%;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+        
+        .close-dialog:hover {
+          background: rgba(255, 255, 255, 0.3);
+          transform: scale(1.1);
+        }
+        
+        .dialog-content h3 {
+          margin-top: 0;
+          margin-bottom: 1.5rem;
+          font-size: 1.5rem;
+          color: white;
+        }
+        
+        .dialog-content .how-to-play-content {
+          color: white;
+        }
+        
+        .dialog-content .controls-section h4 {
+          color: #ffd700;
+        }
       </style>
       
       <h2>🎮 Game Invitation</h2>
       
       <div class="invitation">
-        <div class="invitation-text">You've been invited to play Planes by</div>
+        <div class="invitation-text">You've been invited to play Cubes by</div>
         <div class="player-name">${player1Name}</div>
         <div class="game-info">Grid Size: ${gridSize}×${gridSize}×${gridSize}</div>
       </div>
@@ -766,8 +880,45 @@ export class GameSetup extends HTMLElement {
         <input type="text" id="player-name" placeholder="Your name" value="Player 2">
       </div>
       
+      <button class="secondary-button" id="how-to-play-btn" style="margin-bottom: 0.5rem;">📖 How to Play</button>
       <button class="primary-button" id="join-game">🚀 Join Game</button>
       <button class="secondary-button" id="decline-game">❌ Decline</button>
+      
+      <!-- How to Play Dialog -->
+      <div id="how-to-play-dialog" class="dialog-overlay" style="display: none;">
+        <div class="dialog-content">
+          <button class="close-dialog" id="close-dialog">✕</button>
+          <h3>📖 How to Play Cubes</h3>
+          <div class="how-to-play-content">
+            <p><strong>Objective:</strong> Capture more cubes than your opponent by completing their faces!</p>
+            
+            <ul>
+              <li>🎯 <strong>Draw lines</strong> between adjacent dots to form squares (cube faces)</li>
+              <li>📦 <strong>Complete 4 faces</strong> of a cube to capture it and score a point</li>
+              <li>🔄 <strong>Keep your turn</strong> when you complete a square - chain combos for big scores!</li>
+              <li>🏆 <strong>Win</strong> by capturing the most cubes when all lines are drawn</li>
+            </ul>
+            
+            <div class="controls-section">
+              <h4>🎮 Game Controls</h4>
+              <div class="control-item">
+                <span class="control-icon">🖱️</span>
+                <span>Left Click on dots to draw lines between them</span>
+              </div>
+              <div class="control-item">
+                <span class="control-icon">🔄</span>
+                <span>Right Click + Drag to rotate the 3D view</span>
+              </div>
+              <div class="control-item">
+                <span class="control-icon">🔍</span>
+                <span>Scroll to zoom in and out</span>
+              </div>
+            </div>
+            
+            <p style="margin-top: 1rem; font-style: italic;">💡 Tip: Plan ahead! Setting up multiple squares in one turn can lead to massive scoring chains!</p>
+          </div>
+        </div>
+      </div>
     `;
     
     this.setupInvitationListeners(roomId);
@@ -776,6 +927,9 @@ export class GameSetup extends HTMLElement {
   private setupInvitationListeners(roomId: string) {
     const joinButton = this.shadowRoot!.querySelector('#join-game') as HTMLButtonElement;
     const declineButton = this.shadowRoot!.querySelector('#decline-game') as HTMLButtonElement;
+    const howToPlayBtn = this.shadowRoot!.querySelector('#how-to-play-btn') as HTMLButtonElement;
+    const howToPlayDialog = this.shadowRoot!.querySelector('#how-to-play-dialog') as HTMLDivElement;
+    const closeDialogBtn = this.shadowRoot!.querySelector('#close-dialog') as HTMLButtonElement;
     
     if (joinButton) {
       joinButton.addEventListener('click', () => {
@@ -792,6 +946,25 @@ export class GameSetup extends HTMLElement {
         this.setupEventListeners();
       });
     }
+    
+    if (howToPlayBtn && howToPlayDialog) {
+      howToPlayBtn.addEventListener('click', () => {
+        howToPlayDialog.style.display = 'flex';
+      });
+    }
+    
+    if (closeDialogBtn && howToPlayDialog) {
+      closeDialogBtn.addEventListener('click', () => {
+        howToPlayDialog.style.display = 'none';
+      });
+      
+      // Also close when clicking outside the dialog content
+      howToPlayDialog.addEventListener('click', (e) => {
+        if (e.target === howToPlayDialog) {
+          howToPlayDialog.style.display = 'none';
+        }
+      });
+    }
   }
   
   private showRoomNotFound() {
@@ -802,7 +975,7 @@ export class GameSetup extends HTMLElement {
         :host {
           display: block;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          padding: 2rem;
+          padding: 2rem !important;
           border-radius: 12px;
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
           color: white;
@@ -817,7 +990,7 @@ export class GameSetup extends HTMLElement {
         
         .error-message {
           text-align: center;
-          padding: 2rem;
+          padding: 2rem !important;
           font-size: 1.1rem;
           opacity: 0.9;
         }
@@ -856,7 +1029,7 @@ export class GameSetup extends HTMLElement {
         :host {
           display: block;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          padding: 2rem;
+          padding: 2rem !important;
           border-radius: 12px;
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
           color: white;
@@ -871,7 +1044,7 @@ export class GameSetup extends HTMLElement {
         
         .error-message {
           text-align: center;
-          padding: 2rem;
+          padding: 2rem !important;
           font-size: 1.1rem;
           opacity: 0.9;
         }

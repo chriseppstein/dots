@@ -2,7 +2,7 @@ import './components/GameSetup';
 import './components/GameBoard';
 import { GridSize, GameMode } from './core/types';
 
-class PlanesApp {
+class CubesApp {
   private setupScreen: HTMLElement;
   private gameScreen: HTMLElement;
   private gameBoard: any;
@@ -46,5 +46,5 @@ class PlanesApp {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  new PlanesApp();
+  new CubesApp();
 });
