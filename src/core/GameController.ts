@@ -161,7 +161,29 @@ export class GameController {
     }
     
     engineState.turn = serverState.turn || 0;
-    engineState.lastMove = serverState.lastMove || null;
+    
+    // Handle lastMove with proper player reference
+    if (serverState.lastMove) {
+      console.log('Syncing lastMove from server:', serverState.lastMove);
+      engineState.lastMove = {
+        ...serverState.lastMove,
+        player: null // Will be set to proper player reference below
+      };
+      
+      // Find the correct player reference for lastMove
+      if (serverState.lastMove.player) {
+        const lastMovePlayerIndex = serverState.players.findIndex(
+          p => p.id === serverState.lastMove.player.id
+        );
+        if (lastMovePlayerIndex !== -1) {
+          engineState.lastMove.player = engineState.players[lastMovePlayerIndex];
+        }
+      }
+      console.log('Engine lastMove after sync:', engineState.lastMove);
+    } else {
+      console.log('No lastMove in server state, setting to null');
+      engineState.lastMove = null;
+    }
     
     // Handle winner reference
     if (serverState.winner) {
@@ -192,7 +214,8 @@ export class GameController {
    */
   private updateRenderer(): void {
     if (this.renderer) {
-      const state = this.engine.getState();
+      // Use getState() instead of engine.getState() to ensure proper ID mapping
+      const state = this.getState();
       this.renderer.updateFromGameState(state);
     }
   }
@@ -240,6 +263,15 @@ export class GameController {
         const serverId = this.serverPlayerIdMap.get(engineId);
         if (serverId) {
           mappedState.winner.id = serverId;
+        }
+      }
+      
+      // Map lastMove player ID if exists
+      if (mappedState.lastMove && mappedState.lastMove.player) {
+        const engineId = state.lastMove.player.id;
+        const serverId = this.serverPlayerIdMap.get(engineId);
+        if (serverId) {
+          mappedState.lastMove.player.id = serverId;
         }
       }
       

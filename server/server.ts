@@ -213,7 +213,19 @@ io.on('connection', (socket) => {
         ? { ...updatedState.currentPlayer, id: players[0].id }
         : { ...updatedState.currentPlayer, id: players[1].id };
       
+      // Map lastMove player to socket ID if it exists
+      if (updatedState.lastMove && updatedState.lastMove.player) {
+        const lastMovePlayerSocketId = updatedState.lastMove.player.id === 'player1' 
+          ? players[0].id 
+          : players[1].id;
+        stateForClients.lastMove.player = { 
+          ...updatedState.lastMove.player, 
+          id: lastMovePlayerSocketId 
+        };
+      }
+      
       console.log(`Broadcasting game-state-update to room ${roomId}. Turn: ${updatedState.turn}, Current player: ${updatedState.currentPlayer.id}`);
+      console.log('Server sending lastMove:', stateForClients.lastMove);
       io.to(roomId).emit('game-state-update', stateForClients);
       
       if (updatedState.winner) {

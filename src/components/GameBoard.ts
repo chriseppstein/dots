@@ -209,7 +209,18 @@ export class GameBoard extends HTMLElement {
     if (this.renderer) {
       this.renderer.onLineClick((start: Point3D, end: Point3D) => {
         if (!this.controller) return;
-        this.controller.handleMove(start, end);
+        const moveSuccess = this.controller.handleMove(start, end);
+        
+        // For local/AI games, update HUD after each move
+        if (moveSuccess && gameMode !== 'online') {
+          this.updateHUD();
+          
+          // Check for winner
+          const state = this.controller.getState();
+          if (state.winner) {
+            this.showWinner();
+          }
+        }
       });
     }
     
@@ -232,6 +243,7 @@ export class GameBoard extends HTMLElement {
     if (!this.networkManager) return;
     
     this.networkManager.on('game-state-update', (gameState: any) => {
+      console.log('GameBoard received game-state-update, lastMove:', gameState.lastMove);
       if (this.controller) {
         this.controller.handleServerStateUpdate(gameState);
         this.updateHUD();

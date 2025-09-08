@@ -342,12 +342,20 @@ export class GameRenderer {
   }
 
   private areLinesEqual(line1: Line, line2: Line): boolean {
-    return (
-      (line1.start.x === line2.start.x && line1.start.y === line2.start.y && line1.start.z === line2.start.z &&
-       line1.end.x === line2.end.x && line1.end.y === line2.end.y && line1.end.z === line2.end.z) ||
-      (line1.start.x === line2.end.x && line1.start.y === line2.end.y && line1.start.z === line2.end.z &&
-       line1.end.x === line2.start.x && line1.end.y === line2.start.y && line1.end.z === line2.start.z)
+    const forward = (
+      line1.start.x === line2.start.x && line1.start.y === line2.start.y && line1.start.z === line2.start.z &&
+      line1.end.x === line2.end.x && line1.end.y === line2.end.y && line1.end.z === line2.end.z
     );
+    const backward = (
+      line1.start.x === line2.end.x && line1.start.y === line2.end.y && line1.start.z === line2.end.z &&
+      line1.end.x === line2.start.x && line1.end.y === line2.start.y && line1.end.z === line2.start.z
+    );
+    
+    if (forward || backward) {
+      console.log('Lines match!', {line1, line2, forward, backward});
+    }
+    
+    return forward || backward;
   }
 
   private isLineDrawn(line: Line): boolean {
@@ -399,9 +407,15 @@ export class GameRenderer {
     this.cubeSpheres = [];
     
     // Draw lines
+    console.log('Drawing lines, lastMove:', state.lastMove);
     for (const line of state.lines) {
       const color = line.player?.color ? parseInt(line.player.color.replace('#', '0x')) : 0xffffff;
       const isLastMove = state.lastMove && this.areLinesEqual(line, state.lastMove);
+      
+      if (isLastMove) {
+        console.log('Found last move! Creating glowing line:', line);
+      }
+      
       const mesh = isLastMove 
         ? this.createGlowingLineMesh(line, color)
         : this.createLineMesh(line, color);
@@ -539,7 +553,11 @@ export class GameRenderer {
   }
 
   public dispose(): void {
-    this.renderer.dispose();
-    this.container.removeChild(this.renderer.domElement);
+    if (this.renderer) {
+      this.renderer.dispose();
+      if (this.renderer.domElement && this.renderer.domElement.parentNode === this.container) {
+        this.container.removeChild(this.renderer.domElement);
+      }
+    }
   }
 }
