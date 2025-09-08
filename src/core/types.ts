@@ -45,6 +45,7 @@ export interface GameState {
   gameMode: GameMode;
   winner: Player | null;
   turn: number;
+  lastMove?: Line;
 }
 
 export interface GameMove {

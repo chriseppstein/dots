@@ -144,6 +144,7 @@ export class GameEngine {
     }
 
     this.state.lines.push(line);
+    this.state.lastMove = line;
     this.moveHistory.push({
       line,
       player: this.state.currentPlayer,

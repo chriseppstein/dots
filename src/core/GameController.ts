@@ -161,6 +161,7 @@ export class GameController {
     }
     
     engineState.turn = serverState.turn || 0;
+    engineState.lastMove = serverState.lastMove || null;
     
     // Handle winner reference
     if (serverState.winner) {

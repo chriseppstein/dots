@@ -292,6 +292,64 @@ export class GameRenderer {
     return mesh;
   }
 
+  private createGlowingLineMesh(line: Line, color: number): THREE.Mesh {
+    const offset = (this.gridSize - 1) / 2;
+    const start = new THREE.Vector3(
+      line.start.x - offset,
+      line.start.y - offset,
+      line.start.z - offset
+    );
+    const end = new THREE.Vector3(
+      line.end.x - offset,
+      line.end.y - offset,
+      line.end.z - offset
+    );
+    
+    const direction = new THREE.Vector3().subVectors(end, start);
+    const length = direction.length();
+    direction.normalize();
+    
+    const geometry = new THREE.CylinderGeometry(0.08, 0.08, length, 8);
+    
+    // Create a glowing material with emissive properties
+    const material = new THREE.MeshPhongMaterial({
+      color: color,
+      emissive: color,
+      emissiveIntensity: 0.8,
+      shininess: 100
+    });
+    
+    const mesh = new THREE.Mesh(geometry, material);
+    
+    // Add a second, larger transparent cylinder for glow effect
+    const glowGeometry = new THREE.CylinderGeometry(0.12, 0.12, length, 8);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.3
+    });
+    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    mesh.add(glowMesh);
+    
+    const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+    mesh.position.copy(midpoint);
+    
+    const axis = new THREE.Vector3(0, 1, 0);
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(axis, direction);
+    mesh.setRotationFromQuaternion(quaternion);
+    
+    return mesh;
+  }
+
+  private areLinesEqual(line1: Line, line2: Line): boolean {
+    return (
+      (line1.start.x === line2.start.x && line1.start.y === line2.start.y && line1.start.z === line2.start.z &&
+       line1.end.x === line2.end.x && line1.end.y === line2.end.y && line1.end.z === line2.end.z) ||
+      (line1.start.x === line2.end.x && line1.start.y === line2.end.y && line1.start.z === line2.end.z &&
+       line1.end.x === line2.start.x && line1.end.y === line2.start.y && line1.end.z === line2.start.z)
+    );
+  }
+
   private isLineDrawn(line: Line): boolean {
     const key = this.getLineKey(line);
     return this.drawnLines.has(key);
@@ -343,7 +401,10 @@ export class GameRenderer {
     // Draw lines
     for (const line of state.lines) {
       const color = line.player?.color ? parseInt(line.player.color.replace('#', '0x')) : 0xffffff;
-      const mesh = this.createLineMesh(line, color);
+      const isLastMove = state.lastMove && this.areLinesEqual(line, state.lastMove);
+      const mesh = isLastMove 
+        ? this.createGlowingLineMesh(line, color)
+        : this.createLineMesh(line, color);
       const key = this.getLineKey(line);
       this.drawnLines.set(key, mesh);
       this.gridGroup.add(mesh);
