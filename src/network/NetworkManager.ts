@@ -13,7 +13,15 @@ export class NetworkManager {
   private playerId: string | null = null;
   private callbacks: Map<string, Function> = new Map();
 
-  constructor(serverUrl: string = 'http://localhost:3002') {
+  constructor(serverUrl?: string) {
+    // Auto-detect server URL based on current host
+    if (!serverUrl) {
+      const host = window.location.hostname;
+      const protocol = window.location.protocol;
+      serverUrl = `${protocol}//${host}:3002`;
+    }
+    
+    console.log('NetworkManager connecting to:', serverUrl);
     this.socket = io(serverUrl, {
       autoConnect: false
     });

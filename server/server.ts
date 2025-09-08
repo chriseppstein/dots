@@ -8,7 +8,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: ["http://localhost:3000", "http://localhost:3001"],
+    origin: ["http://localhost:3000", "http://localhost:3001", "http://192.168.0.209:3000"],
     methods: ["GET", "POST"]
   }
 });
@@ -260,8 +260,10 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3002;
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Local access: http://localhost:${PORT}`);
+  console.log(`Network access: http://192.168.0.209:${PORT}`);
 }).on('error', (error: any) => {
   console.error('Failed to start server:', error.message);
   
