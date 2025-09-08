@@ -361,8 +361,9 @@ export class GameRenderer {
     // Draw cube ownership spheres
     for (const cube of state.cubes) {
       if (cube.owner) {
-        // Owned cube - use owner's color
-        this.drawCubeSphere(cube.position, cube.owner.color);
+        // Owned cube - use dark blue for Player 2 spheres, otherwise use owner's color
+        const sphereColor = cube.owner.id === 'player2' ? '#0000FF' : cube.owner.color;
+        this.drawCubeSphere(cube.position, sphereColor);
       } else if (cube.claimedFaces === 6) {
         // All faces claimed but tied (3-3) - use gray
         this.drawCubeSphere(cube.position, '#808080');

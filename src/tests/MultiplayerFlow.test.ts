@@ -66,7 +66,7 @@ describe('Multiplayer Flow Integration', () => {
         currentPlayer: { 
           id: 'player2-socket-id', 
           name: 'Player 2',
-          color: '#0000FF'
+          color: '#87CEEB'
         },
         players: [
           { id: 'player1-socket-id', name: 'Player 1', score: 0, squareCount: 0 },

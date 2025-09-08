@@ -152,7 +152,7 @@ export class GameBoard extends HTMLElement {
           <div class="player-squares" id="player1-squares">Squares: 0</div>
         </div>
         <div class="player-info">
-          <div class="player-name" id="player2-name" style="color: #0000ff;">Player 2</div>
+          <div class="player-name" id="player2-name" style="color: #87CEEB;">Player 2</div>
           <div class="player-score" id="player2-score">0</div>
           <div class="player-squares" id="player2-squares">Squares: 0</div>
         </div>

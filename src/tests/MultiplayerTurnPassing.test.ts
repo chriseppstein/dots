@@ -71,7 +71,7 @@ describe('Multiplayer Turn Passing', () => {
       currentPlayer: { id: 'player1-socket-id', name: 'Player 1', color: '#FF0000', score: 0, squareCount: 0 },
       players: [
         { id: 'player1-socket-id', name: 'Player 1', color: '#FF0000', score: 0, squareCount: 0 },
-        { id: 'player2-socket-id', name: 'Player 2', color: '#0000FF', score: 0, squareCount: 0 }
+        { id: 'player2-socket-id', name: 'Player 2', color: '#87CEEB', score: 0, squareCount: 0 }
       ],
       lines: [],
       cubes: [],
@@ -113,7 +113,7 @@ describe('Multiplayer Turn Passing', () => {
       currentPlayer: { id: 'player1-socket-id', name: 'Player 1', color: '#FF0000', score: 0, squareCount: 0 },
       players: [
         { id: 'player1-socket-id', name: 'Player 1', color: '#FF0000', score: 0, squareCount: 0 },
-        { id: 'player2-socket-id', name: 'Player 2', color: '#0000FF', score: 0, squareCount: 0 }
+        { id: 'player2-socket-id', name: 'Player 2', color: '#87CEEB', score: 0, squareCount: 0 }
       ],
       lines: [],
       cubes: [],
@@ -136,7 +136,7 @@ describe('Multiplayer Turn Passing', () => {
     // Updated state - Player 2's turn
     const updatedState = {
       ...initialState,
-      currentPlayer: { id: 'player2-socket-id', name: 'Player 2', color: '#0000FF', score: 0, squareCount: 0 },
+      currentPlayer: { id: 'player2-socket-id', name: 'Player 2', color: '#87CEEB', score: 0, squareCount: 0 },
       turn: 1,
       lines: [
         { start: { x: 0, y: 0, z: 0 }, end: { x: 1, y: 0, z: 0 }, player: { id: 'player1-socket-id', name: 'Player 1' } }
@@ -161,10 +161,10 @@ describe('Multiplayer Turn Passing', () => {
     // This test verifies the fix for the currentPlayer reference issue
     const gameState = {
       gridSize: 4,
-      currentPlayer: { id: 'player2-socket-id', name: 'Player 2', color: '#0000FF', score: 0, squareCount: 0 },
+      currentPlayer: { id: 'player2-socket-id', name: 'Player 2', color: '#87CEEB', score: 0, squareCount: 0 },
       players: [
         { id: 'player1-socket-id', name: 'Player 1', color: '#FF0000', score: 0, squareCount: 0 },
-        { id: 'player2-socket-id', name: 'Player 2', color: '#0000FF', score: 0, squareCount: 0 }
+        { id: 'player2-socket-id', name: 'Player 2', color: '#87CEEB', score: 0, squareCount: 0 }
       ],
       lines: [],
       cubes: [],

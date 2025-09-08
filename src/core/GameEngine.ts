@@ -23,7 +23,7 @@ export class GameEngine {
     const player2: Player = {
       id: 'player2',
       name: gameMode === 'ai' ? 'AI' : 'Player 2',
-      color: '#0000FF',
+      color: '#87CEEB',
       score: 0,
       squareCount: 0,
       isAI: gameMode === 'ai'
