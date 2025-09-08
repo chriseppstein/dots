@@ -89,10 +89,21 @@ io.on('connection', (socket) => {
     socket.join(roomId);
     
     if (room.players.size === 2 && !room.started) {
+      // IMPORTANT: Send room-joined to Player 2 FIRST so they get their player ID
+      const players = Array.from(room.players.values());
+      const player1Name = players[0]?.name || 'Player 1';
+      
+      socket.emit('room-joined', { 
+        roomId, 
+        playerId, 
+        gameState: null,
+        player1Name: player1Name
+      });
+      
+      // Now start the game
       room.gameEngine = new GameEngine(room.gridSize, 'online');
       room.started = true;
       
-      const players = Array.from(room.players.values());
       const gameState = room.gameEngine.getState();
       
       // Update player names in the engine
@@ -118,8 +129,11 @@ io.on('connection', (socket) => {
       console.log('Turn:', stateForClients.turn);
       console.log('=== END GAME START DEBUG ===');
       
-      io.to(roomId).emit('game-started', stateForClients);
-      console.log(`Game started in room ${roomId}`);
+      // Small delay to ensure room-joined is processed before game-started
+      setTimeout(() => {
+        io.to(roomId).emit('game-started', stateForClients);
+        console.log(`Game started in room ${roomId}`);
+      }, 100);
     } else {
       const players = Array.from(room.players.values());
       const player1Name = players[0]?.name || 'Player 1';
@@ -245,6 +259,17 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3002;
+
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+}).on('error', (error: any) => {
+  console.error('Failed to start server:', error.message);
+  
+  if (error.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use. Please:`);
+    console.error('1. Kill the process using that port, or');
+    console.error('2. Set a different PORT environment variable');
+  }
+  
+  process.exit(1); // Exit with non-zero code to indicate failure
 });

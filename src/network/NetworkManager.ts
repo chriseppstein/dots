@@ -41,8 +41,10 @@ export class NetworkManager {
     });
 
     this.socket.on('room-joined', (data: { roomId: string, playerId: string, gameState: GameState }) => {
+      console.log('🔗 NetworkManager: room-joined received, setting playerId:', data.playerId);
       this.roomId = data.roomId;
       this.playerId = data.playerId;
+      console.log('🔗 NetworkManager: playerId set to:', this.playerId);
       this.emit('room-joined', data);
     });
 
@@ -55,6 +57,25 @@ export class NetworkManager {
     });
 
     this.socket.on('game-started', (gameState: GameState) => {
+      console.log('🎯 NetworkManager: game-started received');
+      
+      // CRITICAL FIX: If playerId is null, extract it from the gameState
+      // This handles cases where room-joined event wasn't received or processed properly
+      if (this.playerId === null && this.socket) {
+        const socketId = this.socket.id;
+        console.log('🔧 NetworkManager: playerId is null, attempting to extract from gameState using socket ID:', socketId);
+        
+        // Find player with matching socket ID in the gameState
+        const matchingPlayer = gameState.players?.find((player: any) => player.id === socketId);
+        if (matchingPlayer) {
+          this.playerId = matchingPlayer.id;
+          console.log('🔧 NetworkManager: Successfully extracted playerId:', this.playerId);
+        } else {
+          console.warn('🚨 NetworkManager: Could not find matching player in gameState for socket:', socketId);
+          console.log('Available players in gameState:', gameState.players?.map((p: any) => ({ id: p.id, name: p.name })));
+        }
+      }
+      
       this.emit('game-started', gameState);
     });
 
@@ -187,6 +208,7 @@ export class NetworkManager {
   }
 
   public getPlayerId(): string | null {
+    console.log('🔗 NetworkManager: getPlayerId() called, returning:', this.playerId);
     return this.playerId;
   }
 

@@ -306,6 +306,13 @@ export class GameEngine {
     return { ...this.state };
   }
 
+  /**
+   * Get mutable state for direct modification (used for server sync)
+   */
+  public getMutableState(): GameState {
+    return this.state;
+  }
+
   public getPossibleMoves(): Line[] {
     const possibleMoves: Line[] = [];
     const size = this.state.gridSize;
