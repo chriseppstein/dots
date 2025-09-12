@@ -3,6 +3,7 @@ import { GameRenderer } from './GameRenderer';
 import { NetworkManager } from '../network/NetworkManager';
 import { AIPlayer } from '../ai/AIPlayer';
 import { GridSize, GameMode, Point3D, GameState } from './types';
+import { PlayerIdentityService } from './PlayerIdentityService';
 
 /**
  * GameController manages game logic and state without requiring rendering.
@@ -16,7 +17,7 @@ export class GameController {
   private player1Name: string = 'Player 1';
   private player2Name: string = 'Player 2';
   private gameMode: GameMode;
-  private serverPlayerIdMap: Map<string, string> = new Map(); // Maps engine IDs to server socket IDs
+  private playerIdentityService: PlayerIdentityService;
 
   constructor(
     gridSize: GridSize,
@@ -30,6 +31,7 @@ export class GameController {
     this.player1Name = player1Name;
     this.player2Name = player2Name;
     this.networkManager = networkManager;
+    this.playerIdentityService = new PlayerIdentityService();
 
     if (gameMode === 'ai') {
       this.aiPlayer = new AIPlayer(this.engine);
@@ -133,14 +135,15 @@ export class GameController {
     engineState.lines = serverState.lines || [];
     engineState.cubes = serverState.cubes || [];
     
-    // Use Object.assign to properly copy player properties and track ID mappings
+    // Register player ID mappings and copy player properties
     if (serverState.players) {
       for (let i = 0; i < serverState.players.length; i++) {
-        const enginePlayerId = engineState.players[i].id; // 'player1' or 'player2'
+        const enginePlayerId = this.playerIdentityService.getEngineIdByPosition(i);
         const serverPlayerId = serverState.players[i].id; // socket ID
+        const playerName = serverState.players[i].name;
         
-        // Store the mapping
-        this.serverPlayerIdMap.set(enginePlayerId, serverPlayerId);
+        // Register the mapping in the identity service
+        this.playerIdentityService.registerPlayer(enginePlayerId, serverPlayerId, playerName);
         
         // Copy all properties EXCEPT id to preserve engine's internal ID
         const { id: _, ...serverPlayerData } = serverState.players[i];
@@ -151,11 +154,10 @@ export class GameController {
     // Update currentPlayer reference to point to the correct player object
     if (serverState.currentPlayer) {
       // Find the engine player that matches the server's current player
-      const mapEntries = Array.from(this.serverPlayerIdMap.entries());
-      const currentPlayerIndex = mapEntries
-        .findIndex(([engineId, serverId]) => serverId === serverState.currentPlayer.id);
+      const engineId = this.playerIdentityService.getEngineId(serverState.currentPlayer.id);
       
-      if (currentPlayerIndex !== -1) {
+      if (engineId) {
+        const currentPlayerIndex = this.playerIdentityService.getPositionByEngineId(engineId);
         engineState.currentPlayer = engineState.players[currentPlayerIndex];
       }
     }
@@ -235,43 +237,43 @@ export class GameController {
     const state = this.engine.getState();
     
     // If we're in online mode and have ID mappings, return state with server IDs
-    if (this.gameMode === 'online' && this.serverPlayerIdMap.size > 0) {
+    if (this.gameMode === 'online' && this.playerIdentityService.hasMappings()) {
       // Create a deep copy to avoid modifying the engine's state
       const mappedState = JSON.parse(JSON.stringify(state));
       
       // Map player IDs
       for (let i = 0; i < mappedState.players.length; i++) {
         const engineId = state.players[i].id;
-        const serverId = this.serverPlayerIdMap.get(engineId);
-        if (serverId) {
-          mappedState.players[i].id = serverId;
+        const networkId = this.playerIdentityService.getNetworkId(engineId);
+        if (networkId) {
+          mappedState.players[i].id = networkId;
         }
       }
       
       // Map current player ID
       if (mappedState.currentPlayer) {
         const engineId = state.currentPlayer.id;
-        const serverId = this.serverPlayerIdMap.get(engineId);
-        if (serverId) {
-          mappedState.currentPlayer.id = serverId;
+        const networkId = this.playerIdentityService.getNetworkId(engineId);
+        if (networkId) {
+          mappedState.currentPlayer.id = networkId;
         }
       }
       
       // Map winner ID if exists
       if (mappedState.winner) {
         const engineId = state.winner.id;
-        const serverId = this.serverPlayerIdMap.get(engineId);
-        if (serverId) {
-          mappedState.winner.id = serverId;
+        const networkId = this.playerIdentityService.getNetworkId(engineId);
+        if (networkId) {
+          mappedState.winner.id = networkId;
         }
       }
       
       // Map lastMove player ID if exists
       if (mappedState.lastMove && mappedState.lastMove.player) {
         const engineId = state.lastMove.player.id;
-        const serverId = this.serverPlayerIdMap.get(engineId);
-        if (serverId) {
-          mappedState.lastMove.player.id = serverId;
+        const networkId = this.playerIdentityService.getNetworkId(engineId);
+        if (networkId) {
+          mappedState.lastMove.player.id = networkId;
         }
       }
       
@@ -289,11 +291,19 @@ export class GameController {
   }
 
   /**
+   * Get the player identity service for ID mapping
+   */
+  public getPlayerIdentityService(): PlayerIdentityService {
+    return this.playerIdentityService;
+  }
+
+  /**
    * Clean up resources
    */
   public dispose(): void {
     if (this.renderer) {
       this.renderer.dispose();
     }
+    this.playerIdentityService.clear();
   }
 }
