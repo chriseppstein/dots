@@ -20,6 +20,10 @@ export class GameRenderer {
   private squareOpacity = 0.5; // Configurable opacity for squares
   private lastState: GameState | null = null;
   
+  // Tracking for differential updates
+  private renderedSquareKeys: Set<string> = new Set();
+  private renderedSphereKeys: Set<string> = new Set();
+  
   // Store bound event listeners for proper cleanup
   private boundOnMouseMove: (event: MouseEvent) => void;
   private boundOnMouseDown: (event: MouseEvent) => void;
@@ -388,6 +392,21 @@ export class GameRenderer {
     return `${points[0].x},${points[0].y},${points[0].z}-${points[1].x},${points[1].y},${points[1].z}`;
   }
 
+  private getSquareKey(corners: Point3D[], playerColor: string): string {
+    // Sort corners to create a consistent key
+    const sortedCorners = [...corners].sort((a, b) => {
+      if (a.x !== b.x) return a.x - b.x;
+      if (a.y !== b.y) return a.y - b.y;
+      return a.z - b.z;
+    });
+    const cornerStr = sortedCorners.map(c => `${c.x},${c.y},${c.z}`).join('|');
+    return `${cornerStr}:${playerColor}`;
+  }
+
+  private getSphereKey(position: Point3D, color: string): string {
+    return `${position.x},${position.y},${position.z}:${color}`;
+  }
+
   private handleLineClick(line: Line): void {
     if (this.lineClickCallback && !this.isLineDrawn(line)) {
       this.lineClickCallback(line.start, line.end);
@@ -404,62 +423,207 @@ export class GameRenderer {
     // Store the state for potential re-rendering
     this.lastState = state;
     
-    // Clear existing lines
-    for (const [key, mesh] of this.drawnLines) {
-      this.gridGroup.remove(mesh);
-    }
-    this.drawnLines.clear();
+    // Update lines differentially
+    this.updateLinesDifferentially(state);
     
-    // Clear existing squares
-    for (const square of this.completedSquares) {
-      this.gridGroup.remove(square);
-    }
-    this.completedSquares = [];
+    // Update squares differentially
+    this.updateSquaresDifferentially(state);
     
-    // Clear existing cube spheres
-    for (const sphere of this.cubeSpheres) {
-      this.gridGroup.remove(sphere);
-    }
-    this.cubeSpheres = [];
+    // Update spheres differentially
+    this.updateSpheresDifferentially(state);
+  }
+
+  private updateLinesDifferentially(state: GameState): void {
+    // Create a set of current line keys from the state
+    const currentLineKeys = new Set<string>();
+    const currentLines = new Map<string, { line: Line; isLastMove: boolean }>();
     
-    // Draw lines
     console.log('Drawing lines, lastMove:', state.lastMove);
+    
     for (const line of state.lines) {
-      const color = line.player?.color ? parseInt(line.player.color.replace('#', '0x')) : 0xffffff;
+      const key = this.getLineKey(line);
       const isLastMove = state.lastMove && this.areLinesEqual(line, state.lastMove);
       
       if (isLastMove) {
         console.log('Found last move! Creating glowing line:', line);
       }
       
-      const mesh = isLastMove 
-        ? this.createGlowingLineMesh(line, color)
-        : this.createLineMesh(line, color);
-      const key = this.getLineKey(line);
-      this.drawnLines.set(key, mesh);
-      this.gridGroup.add(mesh);
+      currentLineKeys.add(key);
+      currentLines.set(key, { line, isLastMove });
     }
     
-    // Draw completed squares
+    // Remove lines that are no longer in the state
+    for (const [key, mesh] of this.drawnLines) {
+      if (!currentLineKeys.has(key)) {
+        this.gridGroup.remove(mesh);
+        // Dispose geometry and material to prevent memory leaks
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach(m => m.dispose());
+          } else {
+            mesh.material.dispose();
+          }
+        }
+        this.drawnLines.delete(key);
+      }
+    }
+    
+    // Add new lines or update existing ones that changed (e.g., highlighting)
+    for (const [key, { line, isLastMove }] of currentLines) {
+      const existingMesh = this.drawnLines.get(key);
+      const color = line.player?.color ? parseInt(line.player.color.replace('#', '0x')) : 0xffffff;
+      
+      // Check if line needs to be recreated (new line or highlighting changed)
+      const needsRecreation = !existingMesh || 
+        (isLastMove && !this.isGlowingMesh(existingMesh)) ||
+        (!isLastMove && this.isGlowingMesh(existingMesh));
+      
+      if (needsRecreation) {
+        // Remove existing mesh if it exists
+        if (existingMesh) {
+          this.gridGroup.remove(existingMesh);
+          if (existingMesh.geometry) existingMesh.geometry.dispose();
+          if (existingMesh.material) {
+            if (Array.isArray(existingMesh.material)) {
+              existingMesh.material.forEach(m => m.dispose());
+            } else {
+              existingMesh.material.dispose();
+            }
+          }
+        }
+        
+        // Create new mesh
+        const mesh = isLastMove 
+          ? this.createGlowingLineMesh(line, color)
+          : this.createLineMesh(line, color);
+        
+        this.drawnLines.set(key, mesh);
+        this.gridGroup.add(mesh);
+      }
+    }
+  }
+
+  private updateSquaresDifferentially(state: GameState): void {
+    const currentSquareKeys = new Set<string>();
+    const currentSquares = new Map<string, { corners: Point3D[]; color: string }>();
+    
+    // Collect all current squares
     for (const cube of state.cubes) {
       for (const face of cube.faces) {
         if (face.player) {
-          this.drawCompletedSquare(face.corners, face.player.color);
+          const key = this.getSquareKey(face.corners, face.player.color);
+          currentSquareKeys.add(key);
+          currentSquares.set(key, { corners: face.corners, color: face.player.color });
         }
       }
     }
     
-    // Draw cube ownership spheres
+    // Remove squares that are no longer in the state
+    const squaresToRemove: number[] = [];
+    for (let i = 0; i < this.completedSquares.length; i++) {
+      const mesh = this.completedSquares[i];
+      const key = mesh.userData.squareKey;
+      if (!currentSquareKeys.has(key)) {
+        this.gridGroup.remove(mesh);
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach(m => m.dispose());
+          } else {
+            mesh.material.dispose();
+          }
+        }
+        this.renderedSquareKeys.delete(key);
+        squaresToRemove.push(i);
+      }
+    }
+    
+    // Remove squares from array in reverse order to maintain indices
+    for (let i = squaresToRemove.length - 1; i >= 0; i--) {
+      this.completedSquares.splice(squaresToRemove[i], 1);
+    }
+    
+    // Add new squares
+    for (const [key, { corners, color }] of currentSquares) {
+      if (!this.renderedSquareKeys.has(key)) {
+        this.drawCompletedSquare(corners, color);
+        this.renderedSquareKeys.add(key);
+        
+        // Store the key in the mesh for later identification
+        const lastMesh = this.completedSquares[this.completedSquares.length - 1];
+        if (lastMesh) {
+          lastMesh.userData.squareKey = key;
+        }
+      }
+    }
+  }
+
+  private updateSpheresDifferentially(state: GameState): void {
+    const currentSphereKeys = new Set<string>();
+    const currentSpheres = new Map<string, { position: Point3D; color: string }>();
+    
+    // Collect all current spheres
     for (const cube of state.cubes) {
       if (cube.owner) {
         // Owned cube - use dark blue for Player 2 spheres, otherwise use owner's color
         const sphereColor = cube.owner.id === 'player2' ? '#0000FF' : cube.owner.color;
-        this.drawCubeSphere(cube.position, sphereColor);
+        const key = this.getSphereKey(cube.position, sphereColor);
+        currentSphereKeys.add(key);
+        currentSpheres.set(key, { position: cube.position, color: sphereColor });
       } else if (cube.claimedFaces === 6) {
         // All faces claimed but tied (3-3) - use gray
-        this.drawCubeSphere(cube.position, '#808080');
+        const sphereColor = '#808080';
+        const key = this.getSphereKey(cube.position, sphereColor);
+        currentSphereKeys.add(key);
+        currentSpheres.set(key, { position: cube.position, color: sphereColor });
       }
     }
+    
+    // Remove spheres that are no longer in the state
+    const spheresToRemove: number[] = [];
+    for (let i = 0; i < this.cubeSpheres.length; i++) {
+      const mesh = this.cubeSpheres[i];
+      const key = mesh.userData.sphereKey;
+      if (!currentSphereKeys.has(key)) {
+        this.gridGroup.remove(mesh);
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach(m => m.dispose());
+          } else {
+            mesh.material.dispose();
+          }
+        }
+        this.renderedSphereKeys.delete(key);
+        spheresToRemove.push(i);
+      }
+    }
+    
+    // Remove spheres from array in reverse order to maintain indices
+    for (let i = spheresToRemove.length - 1; i >= 0; i--) {
+      this.cubeSpheres.splice(spheresToRemove[i], 1);
+    }
+    
+    // Add new spheres
+    for (const [key, { position, color }] of currentSpheres) {
+      if (!this.renderedSphereKeys.has(key)) {
+        this.drawCubeSphere(position, color);
+        this.renderedSphereKeys.add(key);
+        
+        // Store the key in the mesh for later identification
+        const lastMesh = this.cubeSpheres[this.cubeSpheres.length - 1];
+        if (lastMesh) {
+          lastMesh.userData.sphereKey = key;
+        }
+      }
+    }
+  }
+
+  private isGlowingMesh(mesh: THREE.Mesh): boolean {
+    // Check if the mesh has the characteristic structure of a glowing line
+    // (it has a child glow mesh)
+    return mesh.children && mesh.children.length > 0;
   }
 
   private drawCompletedSquare(corners: Point3D[], color: string): void {
@@ -563,6 +727,8 @@ export class GameRenderer {
     this.completedSquares = [];
     this.cubeSpheres = [];
     this.lastState = null;
+    this.renderedSquareKeys.clear();
+    this.renderedSphereKeys.clear();
     
     this.createGrid();
     this.setupCamera();
