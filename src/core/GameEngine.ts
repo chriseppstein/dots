@@ -308,10 +308,164 @@ export class GameEngine {
   }
 
   /**
-   * Get mutable state for direct modification (used for server sync)
+   * Properly synchronize engine state with server state.
+   * This method maintains encapsulation and ensures state consistency.
    */
-  public getMutableState(): GameState {
-    return this.state;
+  public syncWithServerState(serverState: Partial<GameState>): void {
+    // Validate the incoming state
+    if (!serverState) {
+      throw new Error('Server state is required for synchronization');
+    }
+
+    // Create a new state object to maintain immutability principles
+    const newState: GameState = { ...this.state };
+
+    // Sync lines - map player references to engine players
+    if (serverState.lines !== undefined && serverState.players) {
+      newState.lines = serverState.lines.map((line: any) => {
+        if (line.player) {
+          // Find the player index based on server ID
+          const playerIndex = serverState.players!.findIndex(
+            (p: any) => p.id === line.player.id
+          );
+          if (playerIndex !== -1 && playerIndex < this.state.players.length) {
+            return {
+              ...line,
+              player: this.state.players[playerIndex]
+            };
+          }
+        }
+        return line;
+      });
+    } else if (serverState.lines !== undefined) {
+      newState.lines = [...serverState.lines];
+    }
+
+    // Sync cubes
+    if (serverState.cubes !== undefined) {
+      newState.cubes = serverState.cubes.map(cube => ({
+        ...cube,
+        faces: cube.faces.map(face => ({ ...face }))
+      }));
+    }
+
+    // Sync players - maintain engine IDs
+    if (serverState.players !== undefined && serverState.players.length === this.state.players.length) {
+      newState.players = this.state.players.map((enginePlayer, index) => {
+        const serverPlayer = serverState.players![index];
+        return {
+          ...enginePlayer,
+          // Copy all properties except ID
+          name: serverPlayer.name,
+          color: serverPlayer.color,
+          score: serverPlayer.score,
+          squareCount: serverPlayer.squareCount,
+          isAI: serverPlayer.isAI
+        };
+      });
+    }
+
+    // Sync current player - find by position
+    if (serverState.currentPlayer !== undefined && serverState.players) {
+      const currentPlayerIndex = serverState.players.findIndex(
+        p => p.id === serverState.currentPlayer!.id
+      );
+      if (currentPlayerIndex !== -1 && currentPlayerIndex < newState.players.length) {
+        newState.currentPlayer = newState.players[currentPlayerIndex];
+      }
+    }
+
+    // Sync turn
+    if (serverState.turn !== undefined) {
+      newState.turn = serverState.turn;
+    }
+
+    // Sync winner
+    if (serverState.winner !== undefined) {
+      if (serverState.winner && serverState.players) {
+        const winnerIndex = serverState.players.findIndex(
+          p => p.id === serverState.winner!.id
+        );
+        if (winnerIndex !== -1 && winnerIndex < newState.players.length) {
+          newState.winner = newState.players[winnerIndex];
+        }
+      } else {
+        newState.winner = null;
+      }
+    }
+
+    // Sync lastMove
+    if (serverState.lastMove !== undefined) {
+      if (serverState.lastMove && serverState.lastMove.player && serverState.players) {
+        const lastMovePlayerIndex = serverState.players.findIndex(
+          p => p.id === serverState.lastMove!.player.id
+        );
+        if (lastMovePlayerIndex !== -1 && lastMovePlayerIndex < newState.players.length) {
+          newState.lastMove = {
+            ...serverState.lastMove,
+            player: newState.players[lastMovePlayerIndex]
+          };
+        }
+      } else {
+        newState.lastMove = null;
+      }
+    }
+
+    // Validate the new state before applying
+    this.validateState(newState);
+
+    // Apply the new state
+    this.state = newState;
+  }
+
+  /**
+   * Validate game state for consistency
+   */
+  private validateState(state: GameState): void {
+    // Basic validation
+    if (!state.players || state.players.length !== 2) {
+      throw new Error('Game must have exactly 2 players');
+    }
+
+    if (!state.currentPlayer) {
+      throw new Error('Current player must be defined');
+    }
+
+    // Ensure current player is one of the players
+    const currentPlayerExists = state.players.some(p => p.id === state.currentPlayer.id);
+    if (!currentPlayerExists) {
+      throw new Error('Current player must be one of the game players');
+    }
+
+    // Validate turn number
+    if (state.turn < 0) {
+      throw new Error('Turn number cannot be negative');
+    }
+
+    // Validate lines reference existing players
+    // Note: During sync from server, line players might have different IDs that will be resolved
+    // So we only validate if we're not in a sync operation
+    for (const line of state.lines) {
+      if (line.player) {
+        const playerExists = state.players.some(p => p.id === line.player!.id);
+        if (!playerExists) {
+          // Check if it's one of the standard engine IDs
+          const isEngineId = line.player.id === 'player1' || line.player.id === 'player2';
+          if (!isEngineId) {
+            // During sync, server IDs are expected and will be resolved
+            console.warn(`Line references player with ID: ${line.player.id} - will be resolved during sync`);
+          }
+        }
+      }
+    }
+
+    // Validate winner if present
+    if (state.winner) {
+      const winnerExists = state.players.some(p => p.id === state.winner!.id);
+      if (!winnerExists) {
+        throw new Error('Winner must be one of the game players');
+      }
+    }
   }
 
   public getPossibleMoves(): Line[] {

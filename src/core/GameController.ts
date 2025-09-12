@@ -128,14 +128,7 @@ export class GameController {
    * Sync local engine state with server state
    */
   public syncEngineWithServerState(serverState: any): void {
-    // Use getMutableState to directly modify the engine's internal state
-    const engineState = (this.engine as any).getMutableState();
-    
-    // Copy all properties from server state
-    engineState.lines = serverState.lines || [];
-    engineState.cubes = serverState.cubes || [];
-    
-    // Register player ID mappings and copy player properties
+    // Register player ID mappings first
     if (serverState.players) {
       for (let i = 0; i < serverState.players.length; i++) {
         const enginePlayerId = this.playerIdentityService.getEngineIdByPosition(i);
@@ -144,61 +137,19 @@ export class GameController {
         
         // Register the mapping in the identity service
         this.playerIdentityService.registerPlayer(enginePlayerId, serverPlayerId, playerName);
-        
-        // Copy all properties EXCEPT id to preserve engine's internal ID
-        const { id: _, ...serverPlayerData } = serverState.players[i];
-        Object.assign(engineState.players[i], serverPlayerData);
       }
     }
     
-    // Update currentPlayer reference to point to the correct player object
-    if (serverState.currentPlayer) {
-      // Find the engine player that matches the server's current player
-      const engineId = this.playerIdentityService.getEngineId(serverState.currentPlayer.id);
-      
-      if (engineId) {
-        const currentPlayerIndex = this.playerIdentityService.getPositionByEngineId(engineId);
-        engineState.currentPlayer = engineState.players[currentPlayerIndex];
-      }
+    // Use the new proper sync method that maintains encapsulation
+    try {
+      this.engine.syncWithServerState(serverState);
+    } catch (error) {
+      console.error('Failed to sync engine state:', error);
+      // Continue with partial sync rather than crashing
     }
     
-    engineState.turn = serverState.turn || 0;
-    
-    // Handle lastMove with proper player reference
-    if (serverState.lastMove) {
-      console.log('Syncing lastMove from server:', serverState.lastMove);
-      engineState.lastMove = {
-        ...serverState.lastMove,
-        player: null // Will be set to proper player reference below
-      };
-      
-      // Find the correct player reference for lastMove
-      if (serverState.lastMove.player) {
-        const lastMovePlayerIndex = serverState.players.findIndex(
-          p => p.id === serverState.lastMove.player.id
-        );
-        if (lastMovePlayerIndex !== -1) {
-          engineState.lastMove.player = engineState.players[lastMovePlayerIndex];
-        }
-      }
-      console.log('Engine lastMove after sync:', engineState.lastMove);
-    } else {
-      console.log('No lastMove in server state, setting to null');
-      engineState.lastMove = null;
-    }
-    
-    // Handle winner reference
-    if (serverState.winner) {
-      const winnerIndex = engineState.players.findIndex(
-        p => p.id === serverState.winner.id
-      );
-      engineState.winner = winnerIndex !== -1 ? engineState.players[winnerIndex] : null;
-    } else {
-      engineState.winner = null;
-    }
-    
-    engineState.gridSize = serverState.gridSize || engineState.gridSize;
-    engineState.gameMode = serverState.gameMode || engineState.gameMode;
+    // Update renderer if attached
+    this.updateRenderer();
   }
 
   /**
@@ -227,7 +178,7 @@ export class GameController {
    */
   public handleServerStateUpdate(gameState: any): void {
     this.syncEngineWithServerState(gameState);
-    this.updateRenderer();
+    // updateRenderer is already called in syncEngineWithServerState
   }
 
   /**
