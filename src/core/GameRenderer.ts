@@ -19,6 +19,14 @@ export class GameRenderer {
   private cubeSpheres: THREE.Mesh[] = [];
   private squareOpacity = 0.5; // Configurable opacity for squares
   private lastState: GameState | null = null;
+  
+  // Store bound event listeners for proper cleanup
+  private boundOnMouseMove: (event: MouseEvent) => void;
+  private boundOnMouseDown: (event: MouseEvent) => void;
+  private boundOnMouseUp: (event: MouseEvent) => void;
+  private boundOnWheel: (event: WheelEvent) => void;
+  private boundOnContextMenu: (event: MouseEvent) => void;
+  private boundOnWindowResize: () => void;
 
   constructor(container: HTMLElement, gridSize: GridSize = 4) {
     this.container = container;
@@ -43,6 +51,14 @@ export class GameRenderer {
     this.gridGroup = new THREE.Group();
     this.scene.add(this.gridGroup);
     
+    // Bind event handlers once to allow proper removal
+    this.boundOnMouseMove = this.onMouseMove.bind(this);
+    this.boundOnMouseDown = this.onMouseDown.bind(this);
+    this.boundOnMouseUp = this.onMouseUp.bind(this);
+    this.boundOnWheel = this.onWheel.bind(this);
+    this.boundOnContextMenu = (e: MouseEvent) => e.preventDefault();
+    this.boundOnWindowResize = this.onWindowResize.bind(this);
+    
     this.setupLights();
     this.setupCamera();
     this.setupEventListeners();
@@ -66,12 +82,12 @@ export class GameRenderer {
   }
 
   private setupEventListeners(): void {
-    this.renderer.domElement.addEventListener('mousemove', this.onMouseMove.bind(this));
-    this.renderer.domElement.addEventListener('mousedown', this.onMouseDown.bind(this));
-    this.renderer.domElement.addEventListener('mouseup', this.onMouseUp.bind(this));
-    this.renderer.domElement.addEventListener('wheel', this.onWheel.bind(this));
-    this.renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
-    window.addEventListener('resize', this.onWindowResize.bind(this));
+    this.renderer.domElement.addEventListener('mousemove', this.boundOnMouseMove);
+    this.renderer.domElement.addEventListener('mousedown', this.boundOnMouseDown);
+    this.renderer.domElement.addEventListener('mouseup', this.boundOnMouseUp);
+    this.renderer.domElement.addEventListener('wheel', this.boundOnWheel);
+    this.renderer.domElement.addEventListener('contextmenu', this.boundOnContextMenu);
+    window.addEventListener('resize', this.boundOnWindowResize);
   }
 
   private createGrid(): void {
@@ -553,6 +569,17 @@ export class GameRenderer {
   }
 
   public dispose(): void {
+    // Remove event listeners
+    if (this.renderer && this.renderer.domElement) {
+      this.renderer.domElement.removeEventListener('mousemove', this.boundOnMouseMove);
+      this.renderer.domElement.removeEventListener('mousedown', this.boundOnMouseDown);
+      this.renderer.domElement.removeEventListener('mouseup', this.boundOnMouseUp);
+      this.renderer.domElement.removeEventListener('wheel', this.boundOnWheel);
+      this.renderer.domElement.removeEventListener('contextmenu', this.boundOnContextMenu);
+    }
+    window.removeEventListener('resize', this.boundOnWindowResize);
+    
+    // Dispose Three.js resources
     if (this.renderer) {
       this.renderer.dispose();
       if (this.renderer.domElement && this.renderer.domElement.parentNode === this.container) {
