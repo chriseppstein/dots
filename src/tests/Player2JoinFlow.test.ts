@@ -74,11 +74,11 @@ describe('Player 2 Join Flow', () => {
     // Track events received in order
     const eventsReceived: string[] = [];
     
+    // Store the original mock implementation before we override it
+    const storedListeners = new Map<string, Function>();
+    
     // Mock the event handlers to track order
-    const originalOn = mockNetworkManager.on;
     mockNetworkManager.on.mockImplementation((event: string, callback: Function) => {
-      originalOn.call(mockNetworkManager, event, callback);
-      
       // Wrap callback to track when events are received
       const wrappedCallback = (data: any) => {
         eventsReceived.push(event);
@@ -90,7 +90,9 @@ describe('Player 2 Join Flow', () => {
         callback(data);
       };
       
+      // Store both the wrapped callback for later triggering
       mockNetworkManager.listeners.set(event, wrappedCallback);
+      storedListeners.set(event, callback);
     });
 
     // Set up event handlers for Player 2
