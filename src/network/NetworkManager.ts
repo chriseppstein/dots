@@ -1,5 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { GameMove, GameState, GridSize, Point3D } from '../core/types';
+import { GameEventBus, gameEventBus } from '../core/events/GameEventBus';
+import { GameEventType, createEventData } from '../core/events/GameEvents';
 
 export interface RoomInfo {
   roomId: string;
@@ -12,8 +14,9 @@ export class NetworkManager {
   private roomId: string | null = null;
   private playerId: string | null = null;
   private callbacks: Map<string, Function> = new Map();
+  private eventBus: GameEventBus;
 
-  constructor(serverUrl?: string) {
+  constructor(serverUrl?: string, eventBus?: GameEventBus) {
     // Auto-detect server URL based on current host
     if (!serverUrl) {
       const host = window.location.hostname;
@@ -25,6 +28,9 @@ export class NetworkManager {
     this.socket = io(serverUrl, {
       autoConnect: false
     });
+    
+    // Use provided EventBus or global one
+    this.eventBus = eventBus || gameEventBus;
     
     this.setupEventHandlers();
   }
@@ -205,9 +211,95 @@ export class NetworkManager {
   }
 
   private emit(event: string, data?: any): void {
+    // Emit to old callback system for backward compatibility
     const callback = this.callbacks.get(event);
     if (callback) {
       callback(data);
+    }
+    
+    // Also emit to EventBus with proper event types
+    this.emitToEventBus(event, data);
+  }
+  
+  private emitToEventBus(event: string, data?: any): void {
+    // Map old event names to new GameEventType
+    switch (event) {
+      case 'connected':
+        this.eventBus.emit(GameEventType.NETWORK_CONNECTED, createEventData({
+          status: 'connected',
+          source: 'NetworkManager'
+        }));
+        break;
+      case 'disconnected':
+        this.eventBus.emit(GameEventType.NETWORK_DISCONNECTED, createEventData({
+          status: 'disconnected',
+          source: 'NetworkManager'
+        }));
+        break;
+      case 'room-created':
+        this.eventBus.emit(GameEventType.ROOM_CREATED, createEventData({
+          roomId: data.roomId,
+          playerId: data.playerId,
+          source: 'NetworkManager'
+        }));
+        break;
+      case 'room-joined':
+        this.eventBus.emit(GameEventType.ROOM_JOINED, createEventData({
+          roomId: data.roomId,
+          playerId: data.playerId,
+          gameState: data.gameState,
+          source: 'NetworkManager'
+        }));
+        break;
+      case 'player-joined':
+        this.eventBus.emit(GameEventType.PLAYER_JOINED, createEventData({
+          roomId: this.roomId || '',
+          playerId: data.playerId,
+          playerName: data.playerName,
+          source: 'NetworkManager'
+        }));
+        break;
+      case 'player-left':
+        this.eventBus.emit(GameEventType.PLAYER_LEFT, createEventData({
+          roomId: this.roomId || '',
+          playerId: data.playerId,
+          source: 'NetworkManager'
+        }));
+        break;
+      case 'game-started':
+        this.eventBus.emit(GameEventType.GAME_STARTED, createEventData({
+          mode: 'online',
+          gridSize: data.gridSize,
+          players: data.players,
+          roomId: this.roomId || undefined,
+          source: 'NetworkManager'
+        }));
+        break;
+      case 'move-made':
+        this.eventBus.emit(GameEventType.SERVER_MOVE_RECEIVED, createEventData({
+          start: data.start,
+          end: data.end,
+          player: data.player,
+          line: data.line,
+          turn: data.turn,
+          source: 'NetworkManager'
+        }));
+        break;
+      case 'game-state-update':
+        this.eventBus.emit(GameEventType.SERVER_STATE_UPDATE, createEventData({
+          serverState: data,
+          localState: {} as GameState, // Will be filled by handler
+          source: 'NetworkManager'
+        }));
+        break;
+      case 'error':
+        this.eventBus.emit(GameEventType.NETWORK_ERROR, createEventData({
+          status: 'error',
+          message: data,
+          error: new Error(data),
+          source: 'NetworkManager'
+        }));
+        break;
     }
   }
 

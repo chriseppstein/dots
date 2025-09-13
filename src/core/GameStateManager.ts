@@ -1,5 +1,7 @@
 import { GameState, GameMode, Point3D } from './types';
 import { GameEngine } from './GameEngine';
+import { GameEventBus, gameEventBus } from './events/GameEventBus';
+import { GameEventType, createEventData } from './events/GameEvents';
 
 /**
  * Centralized state management for the game.
@@ -9,9 +11,12 @@ export class GameStateManager {
   private engine: GameEngine;
   private listeners: Set<StateChangeListener> = new Set();
   private lastNotifiedState?: string; // JSON string for comparison
+  private eventBus: GameEventBus;
+  private eventUnsubscribers: Array<() => void> = [];
 
-  constructor(engine: GameEngine) {
+  constructor(engine: GameEngine, eventBus?: GameEventBus) {
     this.engine = engine;
+    this.eventBus = eventBus || gameEventBus;
   }
 
   /**
@@ -113,7 +118,10 @@ export class GameStateManager {
     
     this.lastNotifiedState = currentStateJson;
     
-    // Notify all listeners
+    // Emit to EventBus
+    this.emitToEventBus(changeType, currentState, context);
+    
+    // Notify all listeners (for backward compatibility)
     for (const listener of this.listeners) {
       try {
         listener.onStateChange?.call(listener, changeType, currentState, context);
@@ -139,9 +147,85 @@ export class GameStateManager {
   }
 
   /**
+   * Emit state changes to EventBus
+   */
+  private emitToEventBus(changeType: StateChangeType, currentState: GameState, context: StateChangeContext): void {
+    const eventData = createEventData({
+      previousState: context.previousState || {} as GameState,
+      newState: currentState,
+      changeType,
+      source: 'GameStateManager'
+    });
+    
+    // Emit main state change event
+    this.eventBus.emit(GameEventType.STATE_CHANGED, eventData);
+    
+    // Emit specific events based on change type
+    switch (changeType) {
+      case 'move':
+        const moveContext = context as MoveContext;
+        if (moveContext.start && moveContext.end) {
+          this.eventBus.emit(GameEventType.MOVE_MADE, createEventData({
+            start: moveContext.start,
+            end: moveContext.end,
+            player: currentState.currentPlayer,
+            line: currentState.lastMove!,
+            turn: currentState.turn,
+            source: 'GameStateManager'
+          }));
+        }
+        break;
+      
+      case 'sync':
+        this.eventBus.emit(GameEventType.STATE_SYNCED, createEventData({
+          serverState: context.serverState || {},
+          localState: currentState,
+          source: 'GameStateManager'
+        }));
+        break;
+      
+      case 'reset':
+        this.eventBus.emit(GameEventType.GAME_RESET, createEventData({
+          gridSize: currentState.gridSize,
+          mode: currentState.gameMode,
+          source: 'GameStateManager'
+        }));
+        break;
+    }
+    
+    // Check for game end
+    if (currentState.winner) {
+      this.eventBus.emit(GameEventType.GAME_ENDED, createEventData({
+        winner: currentState.winner,
+        finalState: currentState,
+        duration: Date.now() - (context.previousState ? 0 : 0), // Would need start time
+        moves: currentState.lines.length,
+        source: 'GameStateManager'
+      }));
+    }
+    
+    // Check for turn change
+    if (context.previousState && currentState.currentPlayer !== context.previousState.currentPlayer) {
+      this.eventBus.emit(GameEventType.PLAYER_SWITCHED, createEventData({
+        from: context.previousState.currentPlayer,
+        to: currentState.currentPlayer,
+        source: 'GameStateManager'
+      }));
+    }
+  }
+
+  /**
    * Notify listeners of errors
    */
   private notifyError(errorType: string, error: Error): void {
+    // Emit to EventBus
+    this.eventBus.emit(GameEventType.STATE_ERROR, createEventData({
+      error,
+      state: this.getState(),
+      source: 'GameStateManager'
+    }));
+    
+    // Notify listeners (for backward compatibility)
     for (const listener of this.listeners) {
       try {
         listener.onError?.(errorType, error);

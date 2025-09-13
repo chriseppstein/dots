@@ -1,11 +1,20 @@
 import { GridSize, Point3D, Line, Square, Cube, Player, GameState, GameMode, GameMove } from './types';
 import { StateValidator } from './StateValidator';
+import { 
+  IGameCommand, 
+  CommandResult, 
+  MakeMoveCommand, 
+  ResetGameCommand, 
+  SyncStateCommand 
+} from './commands';
 
 export class GameEngine {
   private state: GameState;
   private moveHistory: GameMove[] = [];
   private dots: Point3D[][][] = [];
   private drawnLinesSet: Set<string> = new Set();
+  private commandHistory: IGameCommand[] = [];
+  private listeners: Array<(command: IGameCommand, oldState: GameState, newState: GameState) => void> = [];
 
   constructor(gridSize: GridSize = 4, gameMode: GameMode = 'local') {
     this.state = this.initializeGameState(gridSize, gameMode);
@@ -136,7 +145,133 @@ export class GameEngine {
     };
   }
 
+  /**
+   * Dispatch a command to modify the game state
+   * This is the primary way to change game state going forward
+   */
+  public dispatch(command: IGameCommand): CommandResult {
+    // Validate the command
+    const validation = command.validate(this.state);
+    if (!validation.valid) {
+      return {
+        success: false,
+        validation,
+        error: validation.errors.map(e => e.message).join(', ')
+      };
+    }
+    
+    // Store previous state for rollback if needed
+    const previousState = JSON.parse(JSON.stringify(this.state));
+    
+    try {
+      // Execute the command
+      const newState = command.execute(this.state);
+      
+      // Validate the new state
+      const stateValidation = StateValidator.validate(newState, { allowPartialState: command.type === 'SYNC_STATE' });
+      if (!stateValidation.valid) {
+        return {
+          success: false,
+          validation: stateValidation,
+          error: `Invalid state after command: ${stateValidation.errors.map(e => e.message).join(', ')}`
+        };
+      }
+      
+      // Validate state transition
+      const transitionValidation = StateValidator.validateTransition(
+        previousState,
+        newState,
+        { type: command.type }
+      );
+      
+      if (!transitionValidation.valid && command.type !== 'RESET_GAME' && command.type !== 'SYNC_STATE') {
+        return {
+          success: false,
+          validation: transitionValidation,
+          error: `Invalid state transition: ${transitionValidation.errors.map(e => e.message).join(', ')}`
+        };
+      }
+      
+      // Apply the new state
+      this.state = newState;
+      
+      // Update internal caches
+      this.updateInternalCaches(newState);
+      
+      // Add to command history
+      this.commandHistory.push(command);
+      
+      // Notify listeners
+      this.notifyListeners(command, previousState, newState);
+      
+      return {
+        success: true,
+        state: newState
+      };
+      
+    } catch (error) {
+      // Rollback on error
+      this.state = previousState;
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error during command execution'
+      };
+    }
+  }
+  
+  /**
+   * Add a listener for command execution
+   */
+  public addCommandListener(listener: (command: IGameCommand, oldState: GameState, newState: GameState) => void): void {
+    this.listeners.push(listener);
+  }
+  
+  /**
+   * Remove a command listener
+   */
+  public removeCommandListener(listener: (command: IGameCommand, oldState: GameState, newState: GameState) => void): void {
+    const index = this.listeners.indexOf(listener);
+    if (index !== -1) {
+      this.listeners.splice(index, 1);
+    }
+  }
+  
+  /**
+   * Get command history
+   */
+  public getCommandHistory(): IGameCommand[] {
+    return [...this.commandHistory];
+  }
+  
+  /**
+   * Clear command history
+   */
+  public clearCommandHistory(): void {
+    this.commandHistory = [];
+  }
+  
+  private notifyListeners(command: IGameCommand, oldState: GameState, newState: GameState): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(command, oldState, newState);
+      } catch (error) {
+        console.error('Error in command listener:', error);
+      }
+    }
+  }
+  
+  private updateInternalCaches(state: GameState): void {
+    // Update drawnLinesSet
+    this.drawnLinesSet.clear();
+    for (const line of state.lines) {
+      this.drawnLinesSet.add(this.getLineKey(line));
+    }
+  }
+
   public makeMove(start: Point3D, end: Point3D): boolean {
+    // TODO: Migrate to command pattern in future
+    // For now, use original implementation to maintain compatibility
+    
     if (this.state.winner) return false;
 
     const line: Line = { start, end, player: this.state.currentPlayer };
@@ -344,6 +479,9 @@ export class GameEngine {
    * This method maintains encapsulation and ensures state consistency.
    */
   public syncWithServerState(serverState: Partial<GameState>): void {
+    // TODO: Migrate to command pattern in future
+    // For now, use simpler direct implementation
+    
     // Validate the incoming state
     if (!serverState) {
       throw new Error('Server state is required for synchronization');
@@ -352,29 +490,10 @@ export class GameEngine {
     // Create a new state object to maintain immutability principles
     const newState: GameState = { ...this.state };
 
-    // Sync lines - map player references to engine players
-    if (serverState.lines !== undefined && serverState.players) {
-      newState.lines = serverState.lines.map((line: any) => {
-        if (line.player) {
-          // Find the player index based on server ID
-          const playerIndex = serverState.players!.findIndex(
-            (p: any) => p.id === line.player.id
-          );
-          if (playerIndex !== -1 && playerIndex < this.state.players.length) {
-            return {
-              ...line,
-              player: this.state.players[playerIndex]
-            };
-          }
-        }
-        return line;
-      });
-    } else if (serverState.lines !== undefined) {
-      newState.lines = [...serverState.lines];
-    }
-    
-    // Rebuild the drawnLinesSet with the new lines
+    // Sync lines
     if (serverState.lines !== undefined) {
+      newState.lines = [...serverState.lines];
+      // Rebuild the drawnLinesSet
       this.drawnLinesSet.clear();
       for (const line of newState.lines) {
         this.drawnLinesSet.add(this.getLineKey(line));
@@ -395,7 +514,6 @@ export class GameEngine {
         const serverPlayer = serverState.players![index];
         return {
           ...enginePlayer,
-          // Copy all properties except ID
           name: serverPlayer.name,
           color: serverPlayer.color,
           score: serverPlayer.score,
@@ -405,7 +523,7 @@ export class GameEngine {
       });
     }
 
-    // Sync current player - find by position
+    // Sync current player
     if (serverState.currentPlayer !== undefined && serverState.players) {
       const currentPlayerIndex = serverState.players.findIndex(
         p => p.id === serverState.currentPlayer!.id
@@ -544,10 +662,12 @@ export class GameEngine {
   }
 
   public reset(gridSize?: GridSize): void {
+    // TODO: Migrate to command pattern in future
+    // For now, use original implementation
     this.state = this.initializeGameState(gridSize || this.state.gridSize, this.state.gameMode);
     this.moveHistory = [];
     this.dots = [];
-    this.drawnLinesSet.clear(); // Clear the Set
+    this.drawnLinesSet.clear();
     this.initializeDots();
     this.initializeCubes();
   }
