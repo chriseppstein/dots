@@ -1,6 +1,6 @@
 import { BaseGameCommand, CommandType } from './Command';
-import { GameState, Line, Player } from '../types';
-import { ValidationResult, StateValidator } from '../StateValidator';
+import { GameState, Player } from '../types';
+import { ValidationResult } from '../StateValidator';
 
 /**
  * Command for syncing state with server.
@@ -13,7 +13,7 @@ export class SyncStateCommand extends BaseGameCommand {
     super(CommandType.SYNC_STATE, false); // Cannot be undone
   }
   
-  validate(state: GameState): ValidationResult {
+  validate(_state: GameState): ValidationResult {
     // Sync is always allowed, but we'll validate the resulting state
     return {
       valid: true,
@@ -102,7 +102,7 @@ export class SyncStateCommand extends BaseGameCommand {
           this.serverState.lastMove.player && 
           this.serverState.players) {
         const lastMovePlayerIndex = this.serverState.players.findIndex(
-          p => p.id === this.serverState.lastMove!.player.id
+          p => p.id === this.serverState.lastMove!.player!.id
         );
         if (lastMovePlayerIndex !== -1 && lastMovePlayerIndex < newState.players.length) {
           newState.lastMove = {
@@ -111,7 +111,7 @@ export class SyncStateCommand extends BaseGameCommand {
           };
         }
       } else {
-        newState.lastMove = null;
+        newState.lastMove = undefined;
       }
     }
     

@@ -1,5 +1,9 @@
 export { 
   GameEventType,
+  createEventData
+} from './GameEvents';
+
+export type { 
   BaseEventData,
   StateChangeEventData,
   MoveEventData,
@@ -12,8 +16,7 @@ export {
   GameStartEventData,
   GameEndEventData,
   GameEventDataMap,
-  IGameEventEmitter,
-  createEventData
+  IGameEventEmitter
 } from './GameEvents';
 
 export { 

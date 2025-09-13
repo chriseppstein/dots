@@ -14,7 +14,7 @@ export class ResetGameCommand extends BaseGameCommand {
     super(CommandType.RESET_GAME, false); // Cannot be undone
   }
   
-  validate(state: GameState): ValidationResult {
+  validate(_state: GameState): ValidationResult {
     // Reset is always valid
     return {
       valid: true,
@@ -59,7 +59,7 @@ export class ResetGameCommand extends BaseGameCommand {
       gameMode: this.gameMode,
       winner: null,
       turn: 0,
-      lastMove: null
+      lastMove: undefined
     };
     
     return newState;
@@ -83,10 +83,12 @@ export class ResetGameCommand extends BaseGameCommand {
           cubes.push({
             position: { x, y, z },
             faces: Array(6).fill(null).map(() => ({
+              corners: [],
               lines: [],
               player: null
             })),
-            owner: null
+            owner: null,
+            claimedFaces: 0
           });
         }
       }

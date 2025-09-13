@@ -122,13 +122,13 @@ describe('State Synchronization', () => {
 
     it('should handle null lastMove', () => {
       const serverState = {
-        lastMove: null
+        lastMove: undefined
       };
 
       engine.syncWithServerState(serverState);
       const state = engine.getState();
 
-      expect(state.lastMove).toBeNull();
+      expect(state.lastMove).toBeUndefined();
     });
 
     it('should sync cubes with deep copy', () => {

@@ -556,7 +556,7 @@ export class GameEngine {
     if (serverState.lastMove !== undefined) {
       if (serverState.lastMove && serverState.lastMove.player && serverState.players) {
         const lastMovePlayerIndex = serverState.players.findIndex(
-          p => p.id === serverState.lastMove!.player.id
+          p => p.id === serverState.lastMove!.player!.id
         );
         if (lastMovePlayerIndex !== -1 && lastMovePlayerIndex < newState.players.length) {
           newState.lastMove = {
@@ -565,7 +565,7 @@ export class GameEngine {
           };
         }
       } else {
-        newState.lastMove = null;
+        newState.lastMove = undefined;
       }
     }
 

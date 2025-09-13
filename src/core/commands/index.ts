@@ -1,7 +1,10 @@
-export { 
+export type { 
   IGameCommand, 
   CommandData, 
-  CommandResult, 
+  CommandResult
+} from './Command';
+
+export { 
   BaseGameCommand,
   CommandType 
 } from './Command';

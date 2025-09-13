@@ -1,6 +1,6 @@
 import { BaseGameCommand, CommandType } from './Command';
 import { GameState, Point3D, Line, Square, Cube } from '../types';
-import { ValidationResult, StateValidator } from '../StateValidator';
+import type { ValidationResult } from '../StateValidator';
 
 /**
  * Command for making a move in the game.
@@ -206,26 +206,26 @@ export class MakeMoveCommand extends BaseGameCommand {
       // Line is along X axis
       // Can form squares in XY and XZ planes
       squares.push(
-        { corners: this.getSquareCorners(start, 'x', 'y') },
-        { corners: this.getSquareCorners(start, 'x', 'z') },
-        { corners: this.getSquareCorners({ ...start, y: start.y - 1 }, 'x', 'y') },
-        { corners: this.getSquareCorners({ ...start, z: start.z - 1 }, 'x', 'z') }
+        { corners: this.getSquareCorners(start, 'x', 'y'), lines: [], player: null },
+        { corners: this.getSquareCorners(start, 'x', 'z'), lines: [], player: null },
+        { corners: this.getSquareCorners({ ...start, y: start.y - 1 }, 'x', 'y'), lines: [], player: null },
+        { corners: this.getSquareCorners({ ...start, z: start.z - 1 }, 'x', 'z'), lines: [], player: null }
       );
     } else if (dy !== 0) {
       // Line is along Y axis
       squares.push(
-        { corners: this.getSquareCorners(start, 'y', 'x') },
-        { corners: this.getSquareCorners(start, 'y', 'z') },
-        { corners: this.getSquareCorners({ ...start, x: start.x - 1 }, 'y', 'x') },
-        { corners: this.getSquareCorners({ ...start, z: start.z - 1 }, 'y', 'z') }
+        { corners: this.getSquareCorners(start, 'y', 'x'), lines: [], player: null },
+        { corners: this.getSquareCorners(start, 'y', 'z'), lines: [], player: null },
+        { corners: this.getSquareCorners({ ...start, x: start.x - 1 }, 'y', 'x'), lines: [], player: null },
+        { corners: this.getSquareCorners({ ...start, z: start.z - 1 }, 'y', 'z'), lines: [], player: null }
       );
     } else if (dz !== 0) {
       // Line is along Z axis
       squares.push(
-        { corners: this.getSquareCorners(start, 'z', 'x') },
-        { corners: this.getSquareCorners(start, 'z', 'y') },
-        { corners: this.getSquareCorners({ ...start, x: start.x - 1 }, 'z', 'x') },
-        { corners: this.getSquareCorners({ ...start, y: start.y - 1 }, 'z', 'y') }
+        { corners: this.getSquareCorners(start, 'z', 'x'), lines: [], player: null },
+        { corners: this.getSquareCorners(start, 'z', 'y'), lines: [], player: null },
+        { corners: this.getSquareCorners({ ...start, x: start.x - 1 }, 'z', 'x'), lines: [], player: null },
+        { corners: this.getSquareCorners({ ...start, y: start.y - 1 }, 'z', 'y'), lines: [], player: null }
       );
     }
     
@@ -233,7 +233,7 @@ export class MakeMoveCommand extends BaseGameCommand {
     return squares.filter(s => this.isValidSquare(s));
   }
   
-  private getSquareCorners(origin: Point3D, axis1: string, axis2: string): Point3D[] {
+  private getSquareCorners(origin: Point3D, axis1: 'x' | 'y' | 'z', axis2: 'x' | 'y' | 'z'): Point3D[] {
     const corners: Point3D[] = [];
     const point = { ...origin };
     

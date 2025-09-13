@@ -1146,7 +1146,7 @@ export class GameSetup extends HTMLElement {
     window.history.replaceState({}, document.title, window.location.pathname);
     
     // Reset component state
-    this.currentStep = 'mode-select';
+    this.currentStep = 'mode-selection';
     this.selectedGameMode = null;
     this.selectedGridSize = 4;
     

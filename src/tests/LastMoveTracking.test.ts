@@ -189,7 +189,7 @@ describe('Last Move Tracking', () => {
       
       controller.handleServerStateUpdate(initialState);
       let state = controller.getState();
-      expect(state.lastMove).toBeNull();
+      expect(state.lastMove).toBeUndefined();
       
       // First move
       const stateAfterMove1 = {

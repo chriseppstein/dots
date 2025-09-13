@@ -1,4 +1,4 @@
-import { GameState, GameMode, Point3D } from './types';
+import { GameState, Point3D } from './types';
 import { GameEngine } from './GameEngine';
 import { GameEventBus, gameEventBus } from './events/GameEventBus';
 import { GameEventType, createEventData } from './events/GameEvents';
@@ -12,7 +12,7 @@ export class GameStateManager {
   private listeners: Set<StateChangeListener> = new Set();
   private lastNotifiedState?: string; // JSON string for comparison
   private eventBus: GameEventBus;
-  private eventUnsubscribers: Array<() => void> = [];
+  // private eventUnsubscribers: Array<() => void> = [];
 
   constructor(engine: GameEngine, eventBus?: GameEventBus) {
     this.engine = engine;
@@ -150,15 +150,13 @@ export class GameStateManager {
    * Emit state changes to EventBus
    */
   private emitToEventBus(changeType: StateChangeType, currentState: GameState, context: StateChangeContext): void {
-    const eventData = createEventData({
-      previousState: context.previousState || {} as GameState,
-      newState: currentState,
-      changeType,
-      source: 'GameStateManager'
-    });
     
     // Emit main state change event
-    this.eventBus.emit(GameEventType.STATE_CHANGED, eventData);
+    this.eventBus.emit(GameEventType.STATE_CHANGED, createEventData({
+      previousState: context.previousState || {} as GameState,
+      newState: currentState,
+      changeType: changeType as string
+    }));
     
     // Emit specific events based on change type
     switch (changeType) {
@@ -185,11 +183,12 @@ export class GameStateManager {
         break;
       
       case 'reset':
-        this.eventBus.emit(GameEventType.GAME_RESET, createEventData({
+        this.eventBus.emit(GameEventType.GAME_RESET, {
           gridSize: currentState.gridSize,
           mode: currentState.gameMode,
+          timestamp: Date.now(),
           source: 'GameStateManager'
-        }));
+        });
         break;
     }
     
@@ -206,11 +205,12 @@ export class GameStateManager {
     
     // Check for turn change
     if (context.previousState && currentState.currentPlayer !== context.previousState.currentPlayer) {
-      this.eventBus.emit(GameEventType.PLAYER_SWITCHED, createEventData({
+      this.eventBus.emit(GameEventType.PLAYER_SWITCHED, {
         from: context.previousState.currentPlayer,
         to: currentState.currentPlayer,
+        timestamp: Date.now(),
         source: 'GameStateManager'
-      }));
+      });
     }
   }
 
