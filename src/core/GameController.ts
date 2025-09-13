@@ -5,6 +5,7 @@ import { AIPlayer } from '../ai/AIPlayer';
 import { GridSize, GameMode, Point3D, GameState } from './types';
 import { PlayerIdentityService } from './PlayerIdentityService';
 import { GameStateManager, StateChangeListener } from './GameStateManager';
+import { ResourceManager } from './ResourceManager';
 
 /**
  * GameController manages game logic and state without requiring rendering.
@@ -20,6 +21,8 @@ export class GameController implements StateChangeListener {
   private player2Name: string = 'Player 2';
   private gameMode: GameMode;
   private playerIdentityService: PlayerIdentityService;
+  private resourceManager = new ResourceManager();
+  private aiMoveTimer?: number;
 
   constructor(
     gridSize: GridSize,
@@ -257,7 +260,11 @@ export class GameController implements StateChangeListener {
   public onMove(start: Point3D, end: Point3D, newState: GameState): void {
     // Handle AI moves for AI game mode
     if (this.gameMode === 'ai' && !newState.winner && newState.currentPlayer.isAI) {
-      setTimeout(() => this.makeAIMove(), 500);
+      // Clear any existing AI move timer
+      if (this.aiMoveTimer) {
+        clearTimeout(this.aiMoveTimer);
+      }
+      this.aiMoveTimer = this.resourceManager.setTimeout(() => this.makeAIMove(), 500);
     }
   }
 
@@ -279,11 +286,19 @@ export class GameController implements StateChangeListener {
    * Clean up resources
    */
   public dispose(): void {
+    // Clean up all managed resources
+    this.resourceManager.dispose();
+    
+    // Clean up state manager
     this.stateManager.removeListener(this);
     this.stateManager.dispose();
+    
+    // Clean up renderer
     if (this.renderer) {
       this.renderer.dispose();
     }
+    
+    // Clear player identity service
     this.playerIdentityService.clear();
   }
 }

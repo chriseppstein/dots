@@ -1154,6 +1154,13 @@ export class GameSetup extends HTMLElement {
     this.render();
     this.setupEventListeners();
   }
+
+  /**
+   * Clean up when component is removed from DOM
+   */
+  disconnectedCallback() {
+    this.cleanupNetworkManager();
+  }
 }
 
 

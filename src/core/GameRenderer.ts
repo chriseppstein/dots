@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GridSize, Point3D, Line, GameState } from './types';
+import { ResourceManager } from './ResourceManager';
 
 export class GameRenderer {
   private scene: THREE.Scene;
@@ -28,6 +29,11 @@ export class GameRenderer {
   private boundOnMouseMove: (event: MouseEvent) => void;
   private boundOnMouseDown: (event: MouseEvent) => void;
   private boundOnMouseUp: (event: MouseEvent) => void;
+  
+  // Resource management
+  private resourceManager = new ResourceManager();
+  private animationId?: number;
+  private isDisposed = false;
   private boundOnWheel: (event: WheelEvent) => void;
   private boundOnContextMenu: (event: MouseEvent) => void;
   private boundOnWindowResize: () => void;
@@ -710,7 +716,9 @@ export class GameRenderer {
   }
 
   private animate(): void {
-    requestAnimationFrame(() => this.animate());
+    if (this.isDisposed) return;
+    
+    this.animationId = requestAnimationFrame(() => this.animate());
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -735,6 +743,15 @@ export class GameRenderer {
   }
 
   public dispose(): void {
+    // Mark as disposed to stop animation loop
+    this.isDisposed = true;
+    
+    // Cancel animation frame
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = undefined;
+    }
+    
     // Remove event listeners
     if (this.renderer && this.renderer.domElement) {
       this.renderer.domElement.removeEventListener('mousemove', this.boundOnMouseMove);
@@ -744,6 +761,9 @@ export class GameRenderer {
       this.renderer.domElement.removeEventListener('contextmenu', this.boundOnContextMenu);
     }
     window.removeEventListener('resize', this.boundOnWindowResize);
+    
+    // Dispose all managed resources
+    this.resourceManager.dispose();
     
     // Dispose Three.js resources
     if (this.renderer) {

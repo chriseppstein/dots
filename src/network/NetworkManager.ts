@@ -223,4 +223,23 @@ export class NetworkManager {
   public isConnected(): boolean {
     return this.socket?.connected || false;
   }
+
+  /**
+   * Properly dispose of all resources
+   */
+  public dispose(): void {
+    // Clear all callbacks
+    this.callbacks.clear();
+    
+    // Disconnect and clean up socket
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    
+    // Clear state
+    this.roomId = null;
+    this.playerId = null;
+  }
 }

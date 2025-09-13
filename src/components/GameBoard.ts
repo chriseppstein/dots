@@ -330,6 +330,38 @@ export class GameBoard extends HTMLElement implements StateChangeListener {
     
     this.shadowRoot.appendChild(overlay);
   }
+
+  /**
+   * Clean up when component is removed from DOM
+   */
+  disconnectedCallback() {
+    // Clean up controller and renderer
+    if (this.controller) {
+      this.controller.getStateManager().removeListener(this);
+      this.controller.dispose();
+      this.controller = undefined;
+    }
+    
+    if (this.renderer) {
+      this.renderer.dispose();
+      this.renderer = undefined;
+    }
+    
+    // Clean up network manager
+    if (this.networkManager) {
+      // Remove event listeners
+      this.networkManager.off('game-state-update');
+      this.networkManager.off('player-left');
+      this.networkManager.off('disconnected');
+      
+      // Check if networkManager has dispose method
+      if (typeof (this.networkManager as any).dispose === 'function') {
+        (this.networkManager as any).dispose();
+      }
+      
+      this.networkManager = undefined;
+    }
+  }
 }
 
 customElements.define('game-board', GameBoard);
