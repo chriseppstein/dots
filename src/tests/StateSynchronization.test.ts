@@ -233,7 +233,7 @@ describe('State Synchronization', () => {
 
       expect(() => {
         (engine as any).validateState(invalidState);
-      }).toThrow('Game must have exactly 2 players');
+      }).toThrow('State validation failed: PLAYER_COUNT');
     });
 
     it('should validate that current player exists', () => {
@@ -244,7 +244,7 @@ describe('State Synchronization', () => {
 
       expect(() => {
         (engine as any).validateState(invalidState);
-      }).toThrow('Current player must be one of the game players');
+      }).toThrow('State validation failed: CURRENT_PLAYER_NOT_IN_GAME');
     });
 
     it('should validate turn number is not negative', () => {
@@ -255,7 +255,7 @@ describe('State Synchronization', () => {
 
       expect(() => {
         (engine as any).validateState(invalidState);
-      }).toThrow('Turn number cannot be negative');
+      }).toThrow('State validation failed: INVALID_TURN');
     });
 
     it('should warn about lines referencing non-existent players during sync', () => {
@@ -292,7 +292,7 @@ describe('State Synchronization', () => {
 
       expect(() => {
         (engine as any).validateState(invalidState);
-      }).toThrow('Winner must be one of the game players');
+      }).toThrow('State validation failed: WINNER_NOT_IN_GAME');
     });
   });
 });

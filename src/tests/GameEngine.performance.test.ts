@@ -8,7 +8,10 @@ describe('GameEngine Performance Tests', () => {
     
     // Make some moves to populate the lines array
     const possibleMoves = engine.getPossibleMoves();
-    const movesToMake = Math.min(50, possibleMoves.length);
+    // Calculate max lines: 3 * gridSize * (gridSize-1)^2
+    // For safety, use 70% of max to avoid hitting the limit
+    const maxLines = 3 * gridSize * Math.pow(gridSize - 1, 2);
+    const movesToMake = Math.min(Math.floor(maxLines * 0.7), possibleMoves.length);
     
     for (let i = 0; i < movesToMake; i++) {
       const move = possibleMoves[i];

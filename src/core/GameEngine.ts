@@ -1,4 +1,5 @@
 import { GridSize, Point3D, Line, Square, Cube, Player, GameState, GameMode, GameMove } from './types';
+import { StateValidator } from './StateValidator';
 
 export class GameEngine {
   private state: GameState;
@@ -148,6 +149,9 @@ export class GameEngine {
       return false;
     }
 
+    // Store the previous state for validation
+    const previousState = { ...this.state };
+
     this.state.lines.push(line);
     this.drawnLinesSet.add(this.getLineKey(line)); // Add to Set for O(1) lookups
     this.state.lastMove = line;
@@ -168,6 +172,23 @@ export class GameEngine {
 
     this.state.turn++;
     this.checkWinCondition();
+
+    // Validate the state transition
+    const transitionValidation = StateValidator.validateTransition(
+      previousState,
+      this.state,
+      { type: 'MAKE_MOVE', payload: { start, end } }
+    );
+    
+    if (!transitionValidation.valid) {
+      // Rollback on validation failure
+      this.state = previousState;
+      this.drawnLinesSet.delete(this.getLineKey(line));
+      this.moveHistory.pop();
+      
+      const errorMessages = transitionValidation.errors.map(e => `${e.code}: ${e.message}`).join(', ');
+      throw new Error(`Invalid state transition: ${errorMessages}`);
+    }
 
     return true;
   }
@@ -431,7 +452,8 @@ export class GameEngine {
     }
 
     // Validate the new state before applying
-    this.validateState(newState);
+    // Use partial state validation since server may send incomplete data
+    this.validateState(newState, { allowPartialState: true });
 
     // Apply the new state
     this.state = newState;
@@ -440,20 +462,18 @@ export class GameEngine {
   /**
    * Validate game state for consistency
    */
-  private validateState(state: GameState): void {
-    // Basic validation
-    if (!state.players || state.players.length !== 2) {
-      throw new Error('Game must have exactly 2 players');
+  private validateState(state: GameState, options?: { allowPartialState?: boolean }): void {
+    // Use comprehensive StateValidator
+    const validation = StateValidator.validate(state, options);
+    
+    if (!validation.valid) {
+      const errorMessages = validation.errors.map(e => `${e.code}: ${e.message}`).join(', ');
+      throw new Error(`State validation failed: ${errorMessages}`);
     }
-
-    if (!state.currentPlayer) {
-      throw new Error('Current player must be defined');
-    }
-
-    // Ensure current player is one of the players
-    const currentPlayerExists = state.players.some(p => p.id === state.currentPlayer.id);
-    if (!currentPlayerExists) {
-      throw new Error('Current player must be one of the game players');
+    
+    // Log warnings if any
+    if (validation.warnings.length > 0) {
+      console.warn('State validation warnings:', validation.warnings);
     }
 
     // Validate turn number
