@@ -8,16 +8,70 @@ interface MoveScore {
 
 export class AIPlayer {
   private engine: GameEngine;
+  private drawnLinesSet: Set<string> = new Set();
   
   constructor(engine: GameEngine) {
     this.engine = engine;
   }
   
   public getNextMove(): Line | null {
+    // Build a set of drawn lines for O(1) lookups
+    this.drawnLinesSet.clear();
+    const state = this.engine.getState();
+    for (const line of state.lines) {
+      this.drawnLinesSet.add(this.getLineKey(line));
+    }
+    
     const possibleMoves = this.engine.getPossibleMoves();
     
     if (possibleMoves.length === 0) return null;
     
+    // For very few moves, just evaluate them all
+    if (possibleMoves.length <= 10) {
+      const scoredMoves: MoveScore[] = possibleMoves.map(line => ({
+        line,
+        score: this.evaluateMove(line)
+      }));
+      
+      scoredMoves.sort((a, b) => b.score - a.score);
+      
+      const bestScore = scoredMoves[0].score;
+      const bestMoves = scoredMoves.filter(m => m.score === bestScore);
+      
+      const randomIndex = Math.floor(Math.random() * bestMoves.length);
+      return bestMoves[randomIndex].line;
+    }
+    
+    // For many moves, use early exits to avoid evaluating everything
+    
+    // Early exit: if we can complete a cube immediately, do it
+    for (const line of possibleMoves) {
+      const cubesCompletable = this.countCubesCompletableByLine(line);
+      if (cubesCompletable > 0) {
+        return line; // Take the cube immediately
+      }
+    }
+    
+    // Early exit: if we can complete multiple squares, prioritize that
+    let maxSquares = 0;
+    let bestSquareMove: Line | null = null;
+    for (const line of possibleMoves) {
+      const squaresCompletable = this.countSquaresCompletableByLine(line);
+      if (squaresCompletable > maxSquares) {
+        maxSquares = squaresCompletable;
+        bestSquareMove = line;
+        if (squaresCompletable >= 2) {
+          return line; // Take multiple squares immediately
+        }
+      }
+    }
+    
+    // If we can complete at least one square, do it
+    if (bestSquareMove && maxSquares > 0) {
+      return bestSquareMove;
+    }
+    
+    // Otherwise, evaluate all moves more carefully
     const scoredMoves: MoveScore[] = possibleMoves.map(line => ({
       line,
       score: this.evaluateMove(line)
@@ -154,8 +208,18 @@ export class AIPlayer {
     const adjacent: any[] = [];
     const state = this.engine.getState();
     
+    // Only check adjacent cubes, not all cubes
     for (const otherCube of state.cubes) {
       if (otherCube === cube) continue;
+      
+      // Quick distance check - adjacent cubes must be close
+      const dx = Math.abs(otherCube.position.x - cube.position.x);
+      const dy = Math.abs(otherCube.position.y - cube.position.y);
+      const dz = Math.abs(otherCube.position.z - cube.position.z);
+      
+      // Adjacent cubes are at most 1 unit away in one dimension, 0 in others
+      const distance = dx + dy + dz;
+      if (distance > 1) continue;
       
       for (const face of otherCube.faces) {
         if (this.sharesEdge(square, face)) {
@@ -194,9 +258,15 @@ export class AIPlayer {
   }
   
   private isLineDrawn(line: Line): boolean {
-    const state = this.engine.getState();
-    return state.lines.some(drawnLine => 
-      this.linesEqual(line, drawnLine)
-    );
+    // O(1) lookup using the pre-built set
+    const key = this.getLineKey(line);
+    return this.drawnLinesSet.has(key);
+  }
+  
+  private getLineKey(line: Line): string {
+    // Create a normalized key for the line (handles both directions)
+    const p1 = `${line.start.x},${line.start.y},${line.start.z}`;
+    const p2 = `${line.end.x},${line.end.y},${line.end.z}`;
+    return p1 < p2 ? `${p1}-${p2}` : `${p2}-${p1}`;
   }
 }
