@@ -140,11 +140,30 @@ export class GameBoard extends HTMLElement implements StateChangeListener {
         .final-scores {
           margin: 1rem 0;
         }
+        
+        .debug-download {
+          position: absolute;
+          top: 5px;
+          right: 5px;
+          background: none;
+          border: none;
+          color: rgba(255, 255, 255, 0.3);
+          font-size: 12px;
+          cursor: pointer;
+          padding: 2px;
+          border-radius: 2px;
+          transition: color 0.2s;
+        }
+        
+        .debug-download:hover {
+          color: rgba(255, 255, 255, 0.7);
+        }
       </style>
       
       <div id="render-container"></div>
       
       <div class="hud">
+        <button class="debug-download" id="debug-download" title="Download game state for debugging">⬇</button>
         <div class="current-turn" id="current-turn">
           Current Turn: <span id="turn-player"></span>
         </div>
@@ -231,6 +250,13 @@ export class GameBoard extends HTMLElement implements StateChangeListener {
       if (newGameButton) {
         newGameButton.addEventListener('click', () => {
           this.dispatchEvent(new CustomEvent('newgame'));
+        });
+      }
+      
+      const debugButton = this.shadowRoot.querySelector('#debug-download');
+      if (debugButton) {
+        debugButton.addEventListener('click', () => {
+          this.downloadGameState();
         });
       }
     }
@@ -330,6 +356,67 @@ export class GameBoard extends HTMLElement implements StateChangeListener {
     `;
     
     this.shadowRoot.appendChild(overlay);
+  }
+
+  /**
+   * Downloads the current game state as a JSON file for debugging
+   */
+  private downloadGameState() {
+    if (!this.controller) {
+      console.warn('No controller available for state download');
+      return;
+    }
+
+    try {
+      // Get comprehensive game state
+      const gameState = this.controller.getState();
+      
+      // Create enhanced debug object with additional context
+      const debugData = {
+        timestamp: new Date().toISOString(),
+        gameState,
+        rendererState: this.renderer ? {
+          lastRenderTimestamp: Date.now(),
+          hasPreviewLine: !!(this.renderer as any).previewLine,
+          // Add any other renderer debug info that might be useful
+        } : null,
+        networkState: this.networkManager ? {
+          isConnected: (this.networkManager as any).isConnected || false,
+          // Add network debug info if needed
+        } : null,
+        browserInfo: {
+          userAgent: navigator.userAgent,
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight
+          }
+        }
+      };
+
+      // Convert to formatted JSON
+      const jsonString = JSON.stringify(debugData, null, 2);
+      
+      // Create blob and download
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `game-state-${Date.now()}.json`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      
+      console.log('Game state downloaded successfully');
+    } catch (error) {
+      console.error('Failed to download game state:', error);
+    }
   }
 
   /**
