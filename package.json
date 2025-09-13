@@ -10,7 +10,14 @@
     "server:log": "npx tsx server/server.ts 2>&1 | tee server.log",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "test:performance": "vitest run --config vitest.performance.config.ts",
+    "test:performance:ui": "vitest --ui --config vitest.performance.config.ts",
+    "test:performance:report": "mkdir -p performance-results && vitest run --config vitest.performance.config.ts --reporter=json > performance-results/results.json",
+    "test:webgl": "vitest run --config vitest.performance.config.ts src/tests/WebGLPerformance.integration.test.ts",
+    "test:webgl:ui": "vitest --ui --config vitest.performance.config.ts src/tests/WebGLPerformance.integration.test.ts", 
+    "benchmark": "npm run test:performance",
+    "performance:baseline": "npm run test:performance:report && cp performance-results/results.json performance-results/baseline.json"
   },
   "keywords": [],
   "author": "",
@@ -19,9 +26,12 @@
   "devDependencies": {
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.1",
+    "@types/stats.js": "^0.17.4",
     "@types/three": "^0.180.0",
     "@vitest/ui": "^3.2.4",
     "happy-dom": "^18.0.1",
+    "performance-now": "^2.1.0",
+    "stats.js": "^0.17.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vite": "^5.4.19",
