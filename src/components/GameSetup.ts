@@ -1137,6 +1137,23 @@ export class GameSetup extends HTMLElement {
       alert('Failed to connect to server. Please try again.');
     }
   }
+
+  /**
+   * Reset the component to initial state when returning from a game
+   */
+  public reset(): void {
+    // Clear URL parameters
+    window.history.replaceState({}, document.title, window.location.pathname);
+    
+    // Reset component state
+    this.currentStep = 'mode-select';
+    this.selectedGameMode = null;
+    this.selectedGridSize = 4;
+    
+    // Re-render to initial state
+    this.render();
+    this.setupEventListeners();
+  }
 }
 
 

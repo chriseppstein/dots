@@ -1,9 +1,10 @@
 import { GameController } from '../core/GameController';
 import { GameRenderer } from '../core/GameRenderer';
-import { GridSize, GameMode, Point3D } from '../core/types';
+import { GridSize, GameMode, Point3D, GameState } from '../core/types';
 import { NetworkManager } from '../network/NetworkManager';
+import { StateChangeListener } from '../core/GameStateManager';
 
-export class GameBoard extends HTMLElement {
+export class GameBoard extends HTMLElement implements StateChangeListener {
   private controller?: GameController;
   private renderer?: GameRenderer;
   private renderContainer?: HTMLDivElement;
@@ -178,12 +179,17 @@ export class GameBoard extends HTMLElement {
     }
     
     if (this.controller) {
+      // Unregister self as listener before disposing controller
+      this.controller.getStateManager().removeListener(this);
       this.controller.dispose();
     }
     
     // Create the game controller (handles logic without rendering)
     this.networkManager = networkManager;
     this.controller = new GameController(gridSize, gameMode, player1Name, player2Name, networkManager);
+    
+    // Register as state change listener
+    this.controller.getStateManager().addListener(this);
     
     // Only create renderer if we have a render container (not in test environment)
     if (this.renderContainer) {
@@ -203,24 +209,14 @@ export class GameBoard extends HTMLElement {
       this.controller.initializeDefault();
     }
     
-    this.updateHUD();
+    // Initial HUD update will be handled by state listener
     
     // Set up click handler only if we have a renderer
     if (this.renderer) {
       this.renderer.onLineClick((start: Point3D, end: Point3D) => {
         if (!this.controller) return;
-        const moveSuccess = this.controller.handleMove(start, end);
-        
-        // For local/AI games, update HUD after each move
-        if (moveSuccess && gameMode !== 'online') {
-          this.updateHUD();
-          
-          // Check for winner
-          const state = this.controller.getState();
-          if (state.winner) {
-            this.showWinner();
-          }
-        }
+        this.controller.handleMove(start, end);
+        // State changes (including winner detection) are now handled by listeners
       });
     }
     
@@ -246,12 +242,7 @@ export class GameBoard extends HTMLElement {
       console.log('GameBoard received game-state-update, lastMove:', gameState.lastMove);
       if (this.controller) {
         this.controller.handleServerStateUpdate(gameState);
-        this.updateHUD();
-        
-        // Check for winner
-        if (gameState.winner) {
-          this.showWinner();
-        }
+        // State changes (including winner detection) are now handled by listeners
       }
     });
     
@@ -266,39 +257,56 @@ export class GameBoard extends HTMLElement {
     });
   }
 
-  // AI moves are now handled by the GameController
+  // StateChangeListener implementation
+  
+  /**
+   * Called when the game state changes
+   */
+  public onStateChange(changeType: string, newState: GameState): void {
+    this.updateHUD(newState);
+  }
 
-  // State syncing is now handled by the GameController
+  /**
+   * Called when the game ends
+   */
+  public onGameEnd(winner: any, finalState: GameState): void {
+    this.showWinner();
+  }
 
-  // Game updates are now handled by the GameController
+  /**
+   * Called when an error occurs
+   */
+  public onError(errorType: string, error: Error): void {
+    console.error(`GameBoard error (${errorType}):`, error);
+  }
 
-  private updateHUD() {
+  private updateHUD(state?: GameState) {
     if (!this.shadowRoot || !this.controller) return;
     
-    const state = this.controller.getState();
+    const gameState = state || this.controller.getState();
     
     const turnPlayer = this.shadowRoot.querySelector('#turn-player');
     if (turnPlayer) {
-      turnPlayer.textContent = state.currentPlayer.name;
-      turnPlayer.setAttribute('style', `color: ${state.currentPlayer.color}`);
+      turnPlayer.textContent = gameState.currentPlayer.name;
+      turnPlayer.setAttribute('style', `color: ${gameState.currentPlayer.color}`);
     }
     
     const player1Name = this.shadowRoot.querySelector('#player1-name');
     const player1Score = this.shadowRoot.querySelector('#player1-score');
     const player1Squares = this.shadowRoot.querySelector('#player1-squares');
     if (player1Name && player1Score && player1Squares) {
-      player1Name.textContent = state.players[0].name;
-      player1Score.textContent = state.players[0].score.toString();
-      player1Squares.textContent = `Squares: ${state.players[0].squareCount || 0}`;
+      player1Name.textContent = gameState.players[0].name;
+      player1Score.textContent = gameState.players[0].score.toString();
+      player1Squares.textContent = `Squares: ${gameState.players[0].squareCount || 0}`;
     }
     
     const player2Name = this.shadowRoot.querySelector('#player2-name');
     const player2Score = this.shadowRoot.querySelector('#player2-score');
     const player2Squares = this.shadowRoot.querySelector('#player2-squares');
     if (player2Name && player2Score && player2Squares) {
-      player2Name.textContent = state.players[1].name;
-      player2Score.textContent = state.players[1].score.toString();
-      player2Squares.textContent = `Squares: ${state.players[1].squareCount || 0}`;
+      player2Name.textContent = gameState.players[1].name;
+      player2Score.textContent = gameState.players[1].score.toString();
+      player2Squares.textContent = `Squares: ${gameState.players[1].squareCount || 0}`;
     }
   }
 

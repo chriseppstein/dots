@@ -4,13 +4,15 @@ import { NetworkManager } from '../network/NetworkManager';
 import { AIPlayer } from '../ai/AIPlayer';
 import { GridSize, GameMode, Point3D, GameState } from './types';
 import { PlayerIdentityService } from './PlayerIdentityService';
+import { GameStateManager, StateChangeListener } from './GameStateManager';
 
 /**
  * GameController manages game logic and state without requiring rendering.
  * This allows for testing and server-side game management without WebGL dependencies.
  */
-export class GameController {
+export class GameController implements StateChangeListener {
   private engine: GameEngine;
+  private stateManager: GameStateManager;
   private renderer?: GameRenderer;
   private networkManager?: NetworkManager;
   private aiPlayer?: AIPlayer;
@@ -27,6 +29,7 @@ export class GameController {
     networkManager?: NetworkManager
   ) {
     this.engine = new GameEngine(gridSize, gameMode);
+    this.stateManager = new GameStateManager(this.engine);
     this.gameMode = gameMode;
     this.player1Name = player1Name;
     this.player2Name = player2Name;
@@ -36,6 +39,9 @@ export class GameController {
     if (gameMode === 'ai') {
       this.aiPlayer = new AIPlayer(this.engine);
     }
+
+    // Register self as state change listener
+    this.stateManager.addListener(this);
   }
 
   /**
@@ -59,10 +65,13 @@ export class GameController {
    * Initialize the game with default state (used for local/AI games)
    */
   public initializeDefault(): void {
+    // Update player names directly in engine state
     const state = this.engine.getState();
     state.players[0].name = this.player1Name;
     state.players[1].name = this.player2Name;
-    this.updateRenderer();
+    
+    // Force state change notification through state manager
+    this.stateManager.forceNotify();
   }
 
   /**
@@ -95,15 +104,10 @@ export class GameController {
       return false;
     }
 
-    const success = this.engine.makeMove(start, end);
+    // Use stateManager for centralized move handling
+    const success = this.stateManager.makeMove(start, end);
     
-    if (success) {
-      this.updateGame();
-      
-      if (this.gameMode === 'ai' && !state.winner) {
-        setTimeout(() => this.makeAIMove(), 500);
-      }
-    }
+    // AI moves are now handled by the onStateChange listener
     
     return success;
   }
@@ -114,13 +118,12 @@ export class GameController {
   private makeAIMove(): void {
     if (!this.aiPlayer) return;
     
-    const state = this.engine.getState();
+    const state = this.stateManager.getState();
     if (!state.currentPlayer.isAI || state.winner) return;
     
     const move = this.aiPlayer.getNextMove();
     if (move) {
-      this.engine.makeMove(move.start, move.end);
-      this.updateGame();
+      this.stateManager.makeMove(move.start, move.end);
     }
   }
 
@@ -140,27 +143,10 @@ export class GameController {
       }
     }
     
-    // Use the new proper sync method that maintains encapsulation
-    try {
-      this.engine.syncWithServerState(serverState);
-    } catch (error) {
-      console.error('Failed to sync engine state:', error);
-      // Continue with partial sync rather than crashing
-    }
-    
-    // Update renderer if attached
-    this.updateRenderer();
+    // Use stateManager for centralized sync handling
+    this.stateManager.syncWithServerState(serverState);
   }
 
-  /**
-   * Update the game after a move
-   */
-  private updateGame(): void {
-    const state = this.engine.getState();
-    this.updateRenderer();
-    
-    // Game complete - winner determined
-  }
 
   /**
    * Update the renderer with current game state
@@ -185,7 +171,7 @@ export class GameController {
    * Get the current game state with proper ID mapping for online games
    */
   public getState(): GameState {
-    const state = this.engine.getState();
+    const state = this.stateManager.getState();
     
     // If we're in online mode and have ID mappings, return state with server IDs
     if (this.gameMode === 'online' && this.playerIdentityService.hasMappings()) {
@@ -249,9 +235,52 @@ export class GameController {
   }
 
   /**
+   * Get the state manager for registering listeners
+   */
+  public getStateManager(): GameStateManager {
+    return this.stateManager;
+  }
+
+  // StateChangeListener implementation
+  
+  /**
+   * Called when the game state changes
+   */
+  public onStateChange(changeType: string, newState: GameState): void {
+    // Update renderer whenever state changes
+    this.updateRenderer();
+  }
+
+  /**
+   * Called when a move is made
+   */
+  public onMove(start: Point3D, end: Point3D, newState: GameState): void {
+    // Handle AI moves for AI game mode
+    if (this.gameMode === 'ai' && !newState.winner && newState.currentPlayer.isAI) {
+      setTimeout(() => this.makeAIMove(), 500);
+    }
+  }
+
+  /**
+   * Called when the game ends
+   */
+  public onGameEnd(winner: any, finalState: GameState): void {
+    console.log('Game ended, winner:', winner.name);
+  }
+
+  /**
+   * Called when an error occurs
+   */
+  public onError(errorType: string, error: Error): void {
+    console.error(`GameController error (${errorType}):`, error);
+  }
+
+  /**
    * Clean up resources
    */
   public dispose(): void {
+    this.stateManager.removeListener(this);
+    this.stateManager.dispose();
     if (this.renderer) {
       this.renderer.dispose();
     }

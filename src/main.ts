@@ -42,6 +42,12 @@ class CubesApp {
   private showSetupScreen() {
     this.setupScreen.style.display = 'flex';
     this.gameScreen.style.display = 'none';
+    
+    // Reset the game setup component to initial state
+    const gameSetup = document.querySelector('game-setup') as any;
+    if (gameSetup && gameSetup.reset) {
+      gameSetup.reset();
+    }
   }
 }
 
