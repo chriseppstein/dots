@@ -4,11 +4,16 @@ export class GameEngine {
   private state: GameState;
   private moveHistory: GameMove[] = [];
   private dots: Point3D[][][] = [];
+  private drawnLinesSet: Set<string> = new Set();
 
   constructor(gridSize: GridSize = 4, gameMode: GameMode = 'local') {
     this.state = this.initializeGameState(gridSize, gameMode);
     this.initializeDots();
     this.initializeCubes();
+    // Initialize the drawnLinesSet with any existing lines (should be empty initially)
+    for (const line of this.state.lines) {
+      this.drawnLinesSet.add(this.getLineKey(line));
+    }
   }
 
   private initializeGameState(gridSize: GridSize, gameMode: GameMode): GameState {
@@ -144,6 +149,7 @@ export class GameEngine {
     }
 
     this.state.lines.push(line);
+    this.drawnLinesSet.add(this.getLineKey(line)); // Add to Set for O(1) lookups
     this.state.lastMove = line;
     this.moveHistory.push({
       line,
@@ -188,14 +194,20 @@ export class GameEngine {
   }
 
   private isLineAlreadyDrawn(newLine: Line): boolean {
-    return this.state.lines.some(line => 
-      (this.pointsEqual(line.start, newLine.start) && this.pointsEqual(line.end, newLine.end)) ||
-      (this.pointsEqual(line.start, newLine.end) && this.pointsEqual(line.end, newLine.start))
-    );
+    // O(1) lookup using the Set
+    const key = this.getLineKey(newLine);
+    return this.drawnLinesSet.has(key);
   }
 
   private pointsEqual(p1: Point3D, p2: Point3D): boolean {
     return p1.x === p2.x && p1.y === p2.y && p1.z === p2.z;
+  }
+
+  private getLineKey(line: Line): string {
+    // Create a normalized key for the line (handles both directions)
+    const p1 = `${line.start.x},${line.start.y},${line.start.z}`;
+    const p2 = `${line.end.x},${line.end.y},${line.end.z}`;
+    return p1 < p2 ? `${p1}-${p2}` : `${p2}-${p1}`;
   }
 
   private checkCompletedSquares(newLine: Line): boolean {
@@ -228,10 +240,9 @@ export class GameEngine {
   }
 
   private isLineDrawn(line: Line): boolean {
-    return this.state.lines.some(drawnLine => 
-      (this.pointsEqual(drawnLine.start, line.start) && this.pointsEqual(drawnLine.end, line.end)) ||
-      (this.pointsEqual(drawnLine.start, line.end) && this.pointsEqual(drawnLine.end, line.start))
-    );
+    // O(1) lookup using the Set
+    const key = this.getLineKey(line);
+    return this.drawnLinesSet.has(key);
   }
 
   private checkCompletedCubes(): number {
@@ -339,6 +350,14 @@ export class GameEngine {
       });
     } else if (serverState.lines !== undefined) {
       newState.lines = [...serverState.lines];
+    }
+    
+    // Rebuild the drawnLinesSet with the new lines
+    if (serverState.lines !== undefined) {
+      this.drawnLinesSet.clear();
+      for (const line of newState.lines) {
+        this.drawnLinesSet.add(this.getLineKey(line));
+      }
     }
 
     // Sync cubes
@@ -508,6 +527,7 @@ export class GameEngine {
     this.state = this.initializeGameState(gridSize || this.state.gridSize, this.state.gameMode);
     this.moveHistory = [];
     this.dots = [];
+    this.drawnLinesSet.clear(); // Clear the Set
     this.initializeDots();
     this.initializeCubes();
   }

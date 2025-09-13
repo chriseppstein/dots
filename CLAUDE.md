@@ -93,6 +93,7 @@ Adjacent cubes share faces. The `countUniqueFacesForPlayer()` method uses corner
 - Comprehensive test coverage for game logic, line validation, scoring
 - Specific tests for edge cases like the square counting bug
 - Tests use Vitest with happy-dom environment
+- **Important**: Do not create tests that require WebGL or Three.js rendering context, as these will fail in the test environment. Focus on testing game logic, state management, and non-visual components
 
 ## File Organization
 
@@ -112,6 +113,9 @@ server/
 Vite serves from `src/` directory, builds to `dist/`. Server runs independently for online multiplayer.
 
 ## Development Guidelines
+
+### Testing Before Commits
+**IMPORTANT**: Always ensure all tests pass before committing code. Commits with failing tests make it difficult to use `git bisect` for debugging and can break CI/CD pipelines. Run `npm test` and fix any failures before committing.
 
 ### Server Restart Rule
 **IMPORTANT**: Always restart the server (`npm run server`) after making changes to `server/server.ts`. The server maintains in-memory state for active game rooms, and old state can interfere with testing new code changes.
