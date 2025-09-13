@@ -37,6 +37,9 @@ export class GameRenderer {
   private boundOnWheel: (event: WheelEvent) => void;
   private boundOnContextMenu: (event: MouseEvent) => void;
   private boundOnWindowResize: () => void;
+  
+  // Performance optimization: pre-computed lines for hover detection
+  private possibleLines: Line[] = [];
 
   constructor(container: HTMLElement, gridSize: GridSize = 4) {
     this.container = container;
@@ -106,6 +109,9 @@ export class GameRenderer {
     
     const offset = (this.gridSize - 1) / 2;
     
+    // Pre-compute all possible lines for hover detection optimization
+    this.possibleLines = [];
+    
     for (let x = 0; x < this.gridSize; x++) {
       this.dots[x] = [];
       for (let y = 0; y < this.gridSize; y++) {
@@ -116,9 +122,41 @@ export class GameRenderer {
           dot.userData = { x, y, z };
           this.gridGroup.add(dot);
           this.dots[x][y][z] = dot;
+          
+          // Pre-compute possible lines from this point
+          const point = { x, y, z };
+          
+          // Horizontal line (x direction)
+          if (x < this.gridSize - 1) {
+            this.possibleLines.push({
+              start: point,
+              end: { x: x + 1, y, z },
+              player: null
+            });
+          }
+          
+          // Vertical line (y direction)
+          if (y < this.gridSize - 1) {
+            this.possibleLines.push({
+              start: point,
+              end: { x, y: y + 1, z },
+              player: null
+            });
+          }
+          
+          // Depth line (z direction)
+          if (z < this.gridSize - 1) {
+            this.possibleLines.push({
+              start: point,
+              end: { x, y, z: z + 1 },
+              player: null
+            });
+          }
         }
       }
     }
+    
+    console.log(`Pre-computed ${this.possibleLines.length} possible lines for ${this.gridSize}x${this.gridSize}x${this.gridSize} grid`);
   }
 
   private onMouseMove(event: MouseEvent): void {
@@ -200,52 +238,26 @@ export class GameRenderer {
   private getHoveredLine(): Line | null {
     this.raycaster.setFromCamera(this.mouse, this.camera);
     
-    // Get all possible lines
-    const possibleLines: { line: Line; distance: number }[] = [];
+    // Optimized: iterate through pre-computed lines instead of O(n³) nested loops
+    let closestLine: Line | null = null;
+    let closestDistance = Infinity;
     
-    for (let x = 0; x < this.gridSize; x++) {
-      for (let y = 0; y < this.gridSize; y++) {
-        for (let z = 0; z < this.gridSize; z++) {
-          const point = { x, y, z };
-          
-          // Check horizontal lines (x direction)
-          if (x < this.gridSize - 1) {
-            const line: Line = { start: point, end: { x: x + 1, y, z }, player: null };
-            const distance = this.getLineDistanceFromRay(line);
-            if (distance !== null) {
-              possibleLines.push({ line, distance });
-            }
-          }
-          
-          // Check vertical lines (y direction)
-          if (y < this.gridSize - 1) {
-            const line: Line = { start: point, end: { x, y: y + 1, z }, player: null };
-            const distance = this.getLineDistanceFromRay(line);
-            if (distance !== null) {
-              possibleLines.push({ line, distance });
-            }
-          }
-          
-          // Check depth lines (z direction)
-          if (z < this.gridSize - 1) {
-            const line: Line = { start: point, end: { x, y, z: z + 1 }, player: null };
-            const distance = this.getLineDistanceFromRay(line);
-            if (distance !== null) {
-              possibleLines.push({ line, distance });
-            }
-          }
+    for (const line of this.possibleLines) {
+      const distance = this.getLineDistanceFromRay(line);
+      if (distance !== null && distance < closestDistance) {
+        closestDistance = distance;
+        closestLine = line;
+        
+        // Early exit optimization: if we found a very close line, stop searching
+        if (closestDistance < 0.1) {
+          break;
         }
       }
     }
     
-    // Find the closest line
-    if (possibleLines.length === 0) return null;
-    
-    possibleLines.sort((a, b) => a.distance - b.distance);
-    
     // Return the closest line if it's within a reasonable distance
-    if (possibleLines[0].distance < 0.5) {
-      return possibleLines[0].line;
+    if (closestLine && closestDistance < 0.5) {
+      return closestLine;
     }
     
     return null;
@@ -733,6 +745,7 @@ export class GameRenderer {
     this.drawnLines.clear();
     this.previewLine = null;
     this.completedSquares = [];
+    this.possibleLines = []; // Clear pre-computed lines for re-computation
     this.cubeSpheres = [];
     this.lastState = null;
     this.renderedSquareKeys.clear();
