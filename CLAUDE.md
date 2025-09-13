@@ -114,6 +114,35 @@ Vite serves from `src/` directory, builds to `dist/`. Server runs independently 
 
 ## Development Guidelines
 
+### Client-Server Architecture Principle
+**CRITICAL**: The server must remain agnostic of UI design and visual representation details. Game state should be stored abstractly on the server and interpreted by clients for visual display.
+
+**DO:**
+- Server stores player IDs (e.g., 'player1', 'player2') and abstract game data
+- Client translates player IDs to colors using `PlayerColors.ts`
+- Client handles all visual styling, colors, animations, and UI decisions
+
+**DON'T:**
+- Send color values from server to client
+- Include UI-specific properties in server game state
+- Make server dependent on visual representation choices
+
+This separation ensures:
+- Server can support multiple client types (web, mobile, CLI)
+- UI changes don't require server updates
+- Game logic remains independent of presentation layer
+
+### TypeScript Build Requirement
+**CRITICAL**: The TypeScript build must always pass after making changes. Similar to tests, TypeScript errors should never be left unresolved. Always run `npx tsc --noEmit` after making changes and fix any type errors before considering the work complete.
+
+This ensures:
+- Type safety across the entire codebase
+- Early detection of interface mismatches and API changes
+- Consistent code quality and developer experience
+- Prevention of runtime errors caused by type mismatches
+
+Use `npx tsc --noEmit` to check for type errors without generating JavaScript output.
+
 ### Testing Before Commits
 **IMPORTANT**: Always ensure all tests pass before committing code. Commits with failing tests make it difficult to use `git bisect` for debugging and can break CI/CD pipelines. Run `npm test` and fix any failures before committing.
 

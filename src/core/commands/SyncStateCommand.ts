@@ -57,9 +57,10 @@ export class SyncStateCommand extends BaseGameCommand {
         const serverPlayer = this.serverState.players![index];
         return {
           ...enginePlayer,
-          // Copy all properties except ID (maintain engine ID)
+          // Copy all properties except ID (maintain engine ID) and color (maintain client color)
           name: serverPlayer.name,
-          color: serverPlayer.color,
+          // Preserve client-side color assignment - don't sync colors from server
+          color: enginePlayer.color, // Keep existing client color
           score: serverPlayer.score,
           squareCount: serverPlayer.squareCount,
           isAI: serverPlayer.isAI

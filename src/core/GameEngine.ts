@@ -7,6 +7,7 @@ import {
   ResetGameCommand, 
   SyncStateCommand 
 } from './commands';
+import { PLAYER_COLORS } from './PlayerColors';
 
 export class GameEngine {
   private state: GameState;
@@ -27,10 +28,14 @@ export class GameEngine {
   }
 
   private initializeGameState(gridSize: GridSize, gameMode: GameMode): GameState {
+    // Check if running in server environment (no window object)
+    const isServer = typeof window === 'undefined';
+    
     const player1: Player = {
       id: 'player1',
       name: 'Player 1',
-      color: '#FF0000',
+      // Server doesn't set colors - they're applied client-side based on player ID
+      color: isServer ? '' : PLAYER_COLORS.PLAYER_1,
       score: 0,
       squareCount: 0
     };
@@ -38,7 +43,8 @@ export class GameEngine {
     const player2: Player = {
       id: 'player2',
       name: gameMode === 'ai' ? 'AI' : 'Player 2',
-      color: '#87CEEB',
+      // Server doesn't set colors - they're applied client-side based on player ID
+      color: isServer ? '' : PLAYER_COLORS.PLAYER_2,
       score: 0,
       squareCount: 0,
       isAI: gameMode === 'ai'
@@ -508,14 +514,16 @@ export class GameEngine {
       }));
     }
 
-    // Sync players - maintain engine IDs
+    // Sync players - maintain engine IDs and client-side colors
     if (serverState.players !== undefined && serverState.players.length === this.state.players.length) {
       newState.players = this.state.players.map((enginePlayer, index) => {
         const serverPlayer = serverState.players![index];
         return {
           ...enginePlayer,
           name: serverPlayer.name,
-          color: serverPlayer.color,
+          // Preserve client-side color assignment - don't sync colors from server
+          // Colors are UI concerns and should be determined by client based on player ID
+          color: enginePlayer.color, // Keep existing client color
           score: serverPlayer.score,
           squareCount: serverPlayer.squareCount,
           isAI: serverPlayer.isAI

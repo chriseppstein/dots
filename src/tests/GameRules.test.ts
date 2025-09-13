@@ -11,6 +11,7 @@ import {
   applyMove
 } from '../domain/GameRules';
 import { GameState, Player } from '../core/types';
+import { PLAYER_COLORS } from '../core/PlayerColors';
 
 describe('GameRules - Pure Functions', () => {
   // Helper function to create a test game state
@@ -18,7 +19,7 @@ describe('GameRules - Pure Functions', () => {
     const player1: Player = {
       id: 'player1',
       name: 'Player 1',
-      color: '#FF0000',
+      color: PLAYER_COLORS.PLAYER_1,
       score: 0,
       squareCount: 0
     };

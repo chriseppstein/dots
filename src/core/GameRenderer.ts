@@ -2,6 +2,12 @@ import * as THREE from 'three';
 import { GridSize, Point3D, Line, GameState } from './types';
 import { ResourceManager } from './ResourceManager';
 
+interface LineConsequence {
+  type: 'safe' | 'completes-square' | 'chain-reaction' | 'dangerous-third-line';
+  squareCount: number;
+  chainReaction: boolean;
+}
+
 export class GameRenderer {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -20,6 +26,8 @@ export class GameRenderer {
   private cubeSpheres: THREE.Mesh[] = [];
   private squareOpacity = 0.5; // Configurable opacity for squares
   private lastState: GameState | null = null;
+  private currentPlayerId: string | null = null;
+  private isPlayerTurn: boolean = false;
   
   // Tracking for differential updates
   private renderedSquareKeys: Set<string> = new Set();
@@ -230,7 +238,44 @@ export class GameRenderer {
     }
     
     if (line && !this.isLineDrawn(line)) {
-      this.previewLine = this.createLineMesh(line, 0xffff00, 0.5);
+      // Analyze consequences and choose color accordingly
+      const consequence = this.analyzeLineConsequences(line);
+      let color: number;
+      let baseOpacity = 0.6;
+      
+      // Apply turn-based opacity to preview lines only
+      const turnOpacity = this.isPlayerTurn ? 1.0 : 0.4;
+      
+      switch (consequence.type) {
+        case 'safe':
+          color = 0x00ff00; // Green for safe moves
+          break;
+        case 'completes-square':
+          color = 0xffd700; // Gold for moves that complete squares
+          baseOpacity = 0.7;
+          break;
+        case 'chain-reaction':
+          color = 0xffa500; // Bright orange for chain reactions
+          baseOpacity = 0.8;
+          break;
+        case 'dangerous-third-line':
+          color = 0xff0000; // Red warning for dangerous moves
+          baseOpacity = 0.8;
+          break;
+        default:
+          color = 0xffff00; // Fallback yellow
+      }
+      
+      // Combine base opacity with turn-based opacity
+      const finalOpacity = baseOpacity * turnOpacity;
+      
+      this.previewLine = this.createLineMesh(line, color, finalOpacity);
+      
+      // Add pulsing effect for chain reactions or dangerous moves
+      if (consequence.chainReaction || consequence.type === 'dangerous-third-line') {
+        this.addPulsingEffect(this.previewLine);
+      }
+      
       this.gridGroup.add(this.previewLine);
     }
   }
@@ -425,6 +470,141 @@ export class GameRenderer {
     return `${position.x},${position.y},${position.z}:${color}`;
   }
 
+  /**
+   * Analyze the consequences of drawing a line
+   */
+  private analyzeLineConsequences(line: Line): LineConsequence {
+    if (!this.lastState) {
+      return { type: 'safe', squareCount: 0, chainReaction: false };
+    }
+
+    // Simulate adding this line to the current state
+    const newLines = [...this.lastState.lines, {
+      ...line,
+      player: this.lastState.currentPlayer
+    }];
+
+    // Count how many squares this would complete
+    let completedSquares = 0;
+    let chainPotential = false;
+    let dangerousThirdLines = 0;
+
+    // Check each cube for newly completed faces and dangerous setups
+    for (const cube of this.lastState.cubes) {
+      for (const face of cube.faces) {
+        if (!face.player) {
+          if (this.wouldSquareBeCompleted(face.corners, newLines)) {
+            completedSquares++;
+            
+            // Check if this face completion might lead to cube completion and more turns
+            const faceCount = cube.faces.filter(f => f.player?.id === this.lastState!.currentPlayer.id).length;
+            if (faceCount >= 3) { // Close to winning the cube
+              chainPotential = true;
+            }
+          } else if (this.wouldBeThirdLine(face.corners, newLines)) {
+            // This would be the third line of a square, leaving an easy completion for the opponent
+            dangerousThirdLines++;
+          }
+        }
+      }
+    }
+
+    // Prioritize warnings: dangerous moves first, then completions
+    if (dangerousThirdLines > 0 && completedSquares === 0) {
+      return { type: 'dangerous-third-line', squareCount: 0, chainReaction: false };
+    } else if (completedSquares === 0) {
+      return { type: 'safe', squareCount: 0, chainReaction: false };
+    } else if (completedSquares === 1 && !chainPotential) {
+      return { type: 'completes-square', squareCount: 1, chainReaction: false };
+    } else {
+      return { type: 'chain-reaction', squareCount: completedSquares, chainReaction: true };
+    }
+  }
+
+  /**
+   * Check if a square would be completed with the given lines
+   */
+  private wouldSquareBeCompleted(corners: Point3D[], lines: Line[]): boolean {
+    if (corners.length !== 4) return false;
+
+    // Check all 4 edges of the square
+    const edges = [
+      [corners[0], corners[1]],
+      [corners[1], corners[2]], 
+      [corners[2], corners[3]],
+      [corners[3], corners[0]]
+    ];
+
+    return edges.every(([start, end]) => 
+      lines.some(line => 
+        (this.arePointsEqual(line.start, start) && this.arePointsEqual(line.end, end)) ||
+        (this.arePointsEqual(line.start, end) && this.arePointsEqual(line.end, start))
+      )
+    );
+  }
+
+  private arePointsEqual(p1: Point3D, p2: Point3D): boolean {
+    return p1.x === p2.x && p1.y === p2.y && p1.z === p2.z;
+  }
+
+  /**
+   * Check if adding a line would create the third line of a square (dangerous move)
+   */
+  private wouldBeThirdLine(corners: Point3D[], lines: Line[]): boolean {
+    if (corners.length !== 4) return false;
+
+    // Check all 4 edges of the square
+    const edges = [
+      [corners[0], corners[1]],
+      [corners[1], corners[2]], 
+      [corners[2], corners[3]],
+      [corners[3], corners[0]]
+    ];
+
+    let drawnEdges = 0;
+    for (const [start, end] of edges) {
+      const isDrawn = lines.some(line => 
+        (this.arePointsEqual(line.start, start) && this.arePointsEqual(line.end, end)) ||
+        (this.arePointsEqual(line.start, end) && this.arePointsEqual(line.end, start))
+      );
+      if (isDrawn) {
+        drawnEdges++;
+      }
+    }
+
+    // If we have exactly 3 edges drawn, this would be the third line (leaving 1 for opponent)
+    return drawnEdges === 3;
+  }
+
+  /**
+   * Add a pulsing effect to a line mesh for chain reactions
+   */
+  private addPulsingEffect(mesh: THREE.Mesh): void {
+    if (!mesh.material || Array.isArray(mesh.material)) return;
+    
+    const material = mesh.material as THREE.MeshPhongMaterial;
+    const originalIntensity = material.emissiveIntensity || 0;
+    
+    // Store reference to stop animation later
+    const animate = () => {
+      const time = Date.now() * 0.005;
+      const pulse = Math.sin(time) * 0.3 + 0.7; // Pulse between 0.4 and 1.0
+      material.emissiveIntensity = originalIntensity + pulse * 0.5;
+    };
+    
+    // Add animation to mesh for cleanup
+    (mesh as any).pulseAnimation = animate;
+    
+    // Start animation loop
+    const animationLoop = () => {
+      if (mesh.parent) { // Still in scene
+        animate();
+        requestAnimationFrame(animationLoop);
+      }
+    };
+    requestAnimationFrame(animationLoop);
+  }
+
   private handleLineClick(line: Line): void {
     if (this.lineClickCallback && !this.isLineDrawn(line)) {
       this.lineClickCallback(line.start, line.end);
@@ -437,11 +617,15 @@ export class GameRenderer {
     this.lineClickCallback = callback;
   }
 
-  public updateFromGameState(state: GameState): void {
+  public updateFromGameState(state: GameState, playerId?: string): void {
     // Store the state for potential re-rendering
     this.lastState = state;
     
-    // Update lines differentially
+    // Update turn information for visual feedback
+    this.currentPlayerId = playerId || null;
+    this.isPlayerTurn = playerId ? state.currentPlayer.id === playerId : false;
+    
+    // Update lines differentially (now with turn-based opacity)
     this.updateLinesDifferentially(state);
     
     // Update squares differentially
@@ -460,7 +644,7 @@ export class GameRenderer {
     
     for (const line of state.lines) {
       const key = this.getLineKey(line);
-      const isLastMove = state.lastMove && this.areLinesEqual(line, state.lastMove);
+      const isLastMove = !!(state.lastMove && this.areLinesEqual(line, state.lastMove));
       
       if (isLastMove) {
         console.log('Found last move! Creating glowing line:', line);
@@ -492,6 +676,9 @@ export class GameRenderer {
       const existingMesh = this.drawnLines.get(key);
       const color = line.player?.color ? parseInt(line.player.color.replace('#', '0x')) : 0xffffff;
       
+      // Existing drawn lines always use full opacity (1.0) - they keep their player color
+      const baseOpacity = 1.0;
+      
       // Check if line needs to be recreated (new line or highlighting changed)
       const needsRecreation = !existingMesh || 
         (isLastMove && !this.isGlowingMesh(existingMesh)) ||
@@ -511,10 +698,10 @@ export class GameRenderer {
           }
         }
         
-        // Create new mesh
+        // Create new mesh with turn-based opacity
         const mesh = isLastMove 
           ? this.createGlowingLineMesh(line, color)
-          : this.createLineMesh(line, color);
+          : this.createLineMesh(line, color, baseOpacity);
         
         this.drawnLines.set(key, mesh);
         this.gridGroup.add(mesh);
@@ -721,9 +908,9 @@ export class GameRenderer {
   // Method to adjust square opacity if needed
   public setSquareOpacity(opacity: number): void {
     this.squareOpacity = Math.max(0, Math.min(1, opacity));
-    // Re-render with new opacity
+    // Re-render with new opacity, preserving player ID
     if (this.lastState) {
-      this.updateFromGameState(this.lastState);
+      this.updateFromGameState(this.lastState, this.currentPlayerId || undefined);
     }
   }
 

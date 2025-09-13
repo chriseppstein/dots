@@ -3,6 +3,7 @@ import { GameRenderer } from '../core/GameRenderer';
 import { GridSize, GameMode, Point3D, GameState } from '../core/types';
 import { NetworkManager } from '../network/NetworkManager';
 import { StateChangeListener } from '../core/GameStateManager';
+import { PLAYER_COLORS } from '../core/PlayerColors';
 
 export class GameBoard extends HTMLElement implements StateChangeListener {
   private controller?: GameController;
@@ -148,12 +149,12 @@ export class GameBoard extends HTMLElement implements StateChangeListener {
           Current Turn: <span id="turn-player"></span>
         </div>
         <div class="player-info">
-          <div class="player-name" id="player1-name" style="color: #ff0000;">Player 1</div>
+          <div class="player-name" id="player1-name" style="color: ${PLAYER_COLORS.PLAYER_1};">Player 1</div>
           <div class="player-score" id="player1-score">0</div>
           <div class="player-squares" id="player1-squares">Squares: 0</div>
         </div>
         <div class="player-info">
-          <div class="player-name" id="player2-name" style="color: #87CEEB;">Player 2</div>
+          <div class="player-name" id="player2-name" style="color: ${PLAYER_COLORS.PLAYER_2};">Player 2</div>
           <div class="player-score" id="player2-score">0</div>
           <div class="player-squares" id="player2-squares">Squares: 0</div>
         </div>
@@ -262,14 +263,14 @@ export class GameBoard extends HTMLElement implements StateChangeListener {
   /**
    * Called when the game state changes
    */
-  public onStateChange(changeType: string, newState: GameState): void {
+  public onStateChange(_changeType: string, newState: GameState): void {
     this.updateHUD(newState);
   }
 
   /**
    * Called when the game ends
    */
-  public onGameEnd(winner: any, finalState: GameState): void {
+  public onGameEnd(_winner: any, _finalState: GameState): void {
     this.showWinner();
   }
 

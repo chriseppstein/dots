@@ -158,7 +158,20 @@ export class GameController implements StateChangeListener {
     if (this.renderer) {
       // Use getState() instead of engine.getState() to ensure proper ID mapping
       const state = this.getState();
-      this.renderer.updateFromGameState(state);
+      
+      // Determine current player ID for visual feedback
+      let playerId: string | undefined;
+      if (this.gameMode === 'online' && this.networkManager) {
+        playerId = this.networkManager.getPlayerId() || undefined;
+      } else if (this.gameMode === 'local') {
+        // For local games, use the first player as the "local" player
+        playerId = state.players[0]?.id;
+      } else if (this.gameMode === 'ai') {
+        // For AI games, the human player is the first player
+        playerId = state.players.find(p => !p.isAI)?.id;
+      }
+      
+      this.renderer.updateFromGameState(state, playerId);
     }
   }
 
@@ -200,7 +213,7 @@ export class GameController implements StateChangeListener {
       }
       
       // Map winner ID if exists
-      if (mappedState.winner) {
+      if (mappedState.winner && state.winner) {
         const engineId = state.winner.id;
         const networkId = this.playerIdentityService.getNetworkId(engineId);
         if (networkId) {
@@ -209,7 +222,7 @@ export class GameController implements StateChangeListener {
       }
       
       // Map lastMove player ID if exists
-      if (mappedState.lastMove && mappedState.lastMove.player) {
+      if (mappedState.lastMove && mappedState.lastMove.player && state.lastMove?.player) {
         const engineId = state.lastMove.player.id;
         const networkId = this.playerIdentityService.getNetworkId(engineId);
         if (networkId) {
@@ -249,7 +262,7 @@ export class GameController implements StateChangeListener {
   /**
    * Called when the game state changes
    */
-  public onStateChange(changeType: string, newState: GameState): void {
+  public onStateChange(_changeType: string, _newState: GameState): void {
     // Update renderer whenever state changes
     this.updateRenderer();
   }
@@ -257,7 +270,7 @@ export class GameController implements StateChangeListener {
   /**
    * Called when a move is made
    */
-  public onMove(start: Point3D, end: Point3D, newState: GameState): void {
+  public onMove(_start: Point3D, _end: Point3D, newState: GameState): void {
     // Handle AI moves for AI game mode
     if (this.gameMode === 'ai' && !newState.winner && newState.currentPlayer.isAI) {
       // Clear any existing AI move timer
@@ -271,7 +284,7 @@ export class GameController implements StateChangeListener {
   /**
    * Called when the game ends
    */
-  public onGameEnd(winner: any, finalState: GameState): void {
+  public onGameEnd(winner: any, _finalState: GameState): void {
     console.log('Game ended, winner:', winner.name);
   }
 

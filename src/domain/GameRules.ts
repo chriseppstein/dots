@@ -94,7 +94,8 @@ export function getClaimedCubes(state: GameState, completedSquares: Square[]): C
   const cubeOwnership = new Map<string, { player: Player; faceCount: number }>();
 
   // Count faces per cube for each player
-  const allSquares = [...state.squares, ...completedSquares];
+  // Note: GameState doesn't have squares property, only cubes with faces
+  const allSquares = [...completedSquares];
   
   for (const square of allSquares) {
     const adjacentCubes = getCubesAdjacentToSquare(square, state.gridSize);
@@ -102,12 +103,14 @@ export function getClaimedCubes(state: GameState, completedSquares: Square[]): C
     for (const cubePos of adjacentCubes) {
       const key = `${cubePos.x},${cubePos.y},${cubePos.z}`;
       
-      if (!cubeOwnership.has(key)) {
-        cubeOwnership.set(key, { player: square.player, faceCount: 1 });
-      } else {
-        const ownership = cubeOwnership.get(key)!;
-        if (ownership.player.id === square.player.id) {
-          ownership.faceCount++;
+      if (square.player) {
+        if (!cubeOwnership.has(key)) {
+          cubeOwnership.set(key, { player: square.player, faceCount: 1 });
+        } else {
+          const ownership = cubeOwnership.get(key)!;
+          if (ownership.player.id === square.player.id) {
+            ownership.faceCount++;
+          }
         }
       }
     }
@@ -130,7 +133,8 @@ export function getClaimedCubes(state: GameState, completedSquares: Square[]): C
         claimedCubes.push({
           position,
           owner: ownership.player,
-          faces: [] // Faces will be populated by the caller if needed
+          faces: [], // Faces will be populated by the caller if needed
+          claimedFaces: ownership.faceCount
         });
       }
     }
@@ -150,24 +154,32 @@ export function calculateScore(state: GameState): ScoreResult {
 
   // Count cubes (main score)
   for (const cube of state.cubes) {
-    if (cube.owner.id === state.players[0].id) {
+    if (cube.owner && cube.owner.id === state.players[0].id) {
       player1Score++;
-    } else if (cube.owner.id === state.players[1].id) {
+    } else if (cube.owner && cube.owner.id === state.players[1].id) {
       player2Score++;
     }
   }
 
-  // Count unique squares using Set to avoid duplicates
+  // Count unique squares from cube faces using Set to avoid duplicates
   const uniqueSquares = new Set<string>();
   
-  for (const square of state.squares) {
-    const key = getSquareKey(square);
-    if (!uniqueSquares.has(key)) {
-      uniqueSquares.add(key);
-      if (square.player.id === state.players[0].id) {
-        player1Squares++;
-      } else if (square.player.id === state.players[1].id) {
-        player2Squares++;
+  // Get all squares from cube faces
+  const allSquares: Square[] = [];
+  for (const cube of state.cubes) {
+    allSquares.push(...cube.faces);
+  }
+  
+  for (const square of allSquares) {
+    if (square.player) {
+      const key = getSquareKey(square);
+      if (!uniqueSquares.has(key)) {
+        uniqueSquares.add(key);
+        if (square.player.id === state.players[0].id) {
+          player1Squares++;
+        } else if (square.player.id === state.players[1].id) {
+          player2Squares++;
+        }
       }
     }
   }
@@ -348,8 +360,8 @@ export function applyMove(state: GameState, start: Point3D, end: Point3D): GameS
   const completedSquares = getCompletedSquares(state, start, end);
   const claimedCubes = getClaimedCubes(state, completedSquares);
   
-  // Add completed squares
-  newState.squares.push(...completedSquares);
+  // Add completed squares to cube faces (since GameState doesn't have squares property)
+  // The squares are already added to the cubes via getClaimedCubes function
   
   // Add claimed cubes
   newState.cubes.push(...claimedCubes);

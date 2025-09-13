@@ -88,7 +88,6 @@ export class AIPlayer {
   
   private evaluateMove(line: Line): number {
     let score = 0;
-    const state = this.engine.getState();
     
     const squaresCompletable = this.countSquaresCompletableByLine(line);
     score += squaresCompletable * 100;
@@ -190,7 +189,7 @@ export class AIPlayer {
             const adjacentFaces = this.getAdjacentSquares(face, cube);
             for (const adjFace of adjacentFaces) {
               if (!adjFace.player) {
-                const adjDrawnLines = adjFace.lines.filter(l => this.isLineDrawn(l)).length;
+                const adjDrawnLines = adjFace.lines.filter((_l: any) => this.isLineDrawn(_l)).length;
                 if (adjDrawnLines === 2) {
                   giveaways++;
                 }

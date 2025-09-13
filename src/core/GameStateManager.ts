@@ -185,9 +185,7 @@ export class GameStateManager {
       case 'reset':
         this.eventBus.emit(GameEventType.GAME_RESET, {
           gridSize: currentState.gridSize,
-          mode: currentState.gameMode,
-          timestamp: Date.now(),
-          source: 'GameStateManager'
+          mode: currentState.gameMode
         });
         break;
     }
@@ -207,9 +205,7 @@ export class GameStateManager {
     if (context.previousState && currentState.currentPlayer !== context.previousState.currentPlayer) {
       this.eventBus.emit(GameEventType.PLAYER_SWITCHED, {
         from: context.previousState.currentPlayer,
-        to: currentState.currentPlayer,
-        timestamp: Date.now(),
-        source: 'GameStateManager'
+        to: currentState.currentPlayer
       });
     }
   }
@@ -219,11 +215,10 @@ export class GameStateManager {
    */
   private notifyError(errorType: string, error: Error): void {
     // Emit to EventBus
-    this.eventBus.emit(GameEventType.STATE_ERROR, createEventData({
+    this.eventBus.emit(GameEventType.STATE_ERROR, {
       error,
-      state: this.getState(),
-      source: 'GameStateManager'
-    }));
+      state: this.getState()
+    });
     
     // Notify listeners (for backward compatibility)
     for (const listener of this.listeners) {

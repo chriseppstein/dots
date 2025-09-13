@@ -168,7 +168,8 @@ export function getCubeFaces(position: Point3D): Square[] {
         { x: x + 1, y: y + 1, z },
         { x, y: y + 1, z }
       ],
-      player: null as any // Will be set by caller
+      player: null as any, // Will be set by caller
+      lines: []
     },
     // Back face (z+1)
     {
@@ -178,7 +179,8 @@ export function getCubeFaces(position: Point3D): Square[] {
         { x: x + 1, y: y + 1, z: z + 1 },
         { x, y: y + 1, z: z + 1 }
       ],
-      player: null as any
+      player: null as any,
+      lines: []
     },
     // Left face (x)
     {
@@ -188,7 +190,8 @@ export function getCubeFaces(position: Point3D): Square[] {
         { x, y: y + 1, z: z + 1 },
         { x, y, z: z + 1 }
       ],
-      player: null as any
+      player: null as any,
+      lines: []
     },
     // Right face (x+1)
     {
@@ -198,7 +201,8 @@ export function getCubeFaces(position: Point3D): Square[] {
         { x: x + 1, y: y + 1, z: z + 1 },
         { x: x + 1, y, z: z + 1 }
       ],
-      player: null as any
+      player: null as any,
+      lines: []
     },
     // Bottom face (y)
     {
@@ -208,7 +212,8 @@ export function getCubeFaces(position: Point3D): Square[] {
         { x: x + 1, y, z: z + 1 },
         { x, y, z: z + 1 }
       ],
-      player: null as any
+      player: null as any,
+      lines: []
     },
     // Top face (y+1)
     {
@@ -218,7 +223,8 @@ export function getCubeFaces(position: Point3D): Square[] {
         { x: x + 1, y: y + 1, z: z + 1 },
         { x, y: y + 1, z: z + 1 }
       ],
-      player: null as any
+      player: null as any,
+      lines: []
     }
   ];
 }
