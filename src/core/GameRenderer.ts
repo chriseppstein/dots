@@ -489,23 +489,16 @@ export class GameRenderer {
     let chainPotential = false;
     let dangerousThirdLines = 0;
 
-    // Check each cube for newly completed faces and dangerous setups
-    for (const cube of this.lastState.cubes) {
-      for (const face of cube.faces) {
-        if (!face.player) {
-          if (this.wouldSquareBeCompleted(face.corners, newLines)) {
-            completedSquares++;
-            
-            // Check if this face completion might lead to cube completion and more turns
-            const faceCount = cube.faces.filter(f => f.player?.id === this.lastState!.currentPlayer.id).length;
-            if (faceCount >= 3) { // Close to winning the cube
-              chainPotential = true;
-            }
-          } else if (this.wouldBeThirdLine(face.corners, newLines)) {
-            // This would be the third line of a square, leaving an easy completion for the opponent
-            dangerousThirdLines++;
-          }
-        }
+    // Only check squares that could be affected by this line (more efficient)
+    const relevantSquares = this.getSquaresAdjacentToLine(line, this.lastState.gridSize);
+    
+    for (const squareCorners of relevantSquares) {
+      if (this.wouldSquareBeCompleted(squareCorners, newLines)) {
+        completedSquares++;
+        chainPotential = true; // Any completed square could lead to chain reactions
+      } else if (this.wouldBeThirdLine(squareCorners, newLines)) {
+        // This would be the third line of a square, leaving an easy completion for the opponent
+        dangerousThirdLines++;
       }
     }
 
@@ -574,6 +567,102 @@ export class GameRenderer {
 
     // If we have exactly 3 edges drawn, this would be the third line (leaving 1 for opponent)
     return drawnEdges === 3;
+  }
+
+  /**
+   * Get squares that are adjacent to (contain) the given line
+   */
+  private getSquaresAdjacentToLine(line: Line, gridSize: number): Point3D[][] {
+    const squares: Point3D[][] = [];
+    const { start, end } = line;
+    
+    // Determine the line's orientation
+    const orientation = this.getLineOrientation(start, end);
+    if (!orientation) return squares; // Invalid line
+    
+    // Generate potential squares that could contain this line as an edge
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    const minY = Math.min(start.y, end.y);
+    const maxY = Math.max(start.y, end.y);
+    const minZ = Math.min(start.z, end.z);
+    const maxZ = Math.max(start.z, end.z);
+    
+    // Check cubes adjacent to this line
+    for (let x = Math.max(0, minX - 1); x < Math.min(gridSize - 1, maxX + 1); x++) {
+      for (let y = Math.max(0, minY - 1); y < Math.min(gridSize - 1, maxY + 1); y++) {
+        for (let z = Math.max(0, minZ - 1); z < Math.min(gridSize - 1, maxZ + 1); z++) {
+          const cubePosition = { x, y, z };
+          const cubeFaces = this.getCubeFaces(cubePosition);
+          
+          // Check each face to see if it contains our line as an edge
+          for (const face of cubeFaces) {
+            if (this.squareContainsLine(face.corners, start, end)) {
+              squares.push(face.corners);
+            }
+          }
+        }
+      }
+    }
+    
+    return squares;
+  }
+
+  /**
+   * Check if a square contains the given line as one of its edges
+   */
+  private squareContainsLine(corners: Point3D[], lineStart: Point3D, lineEnd: Point3D): boolean {
+    if (corners.length !== 4) return false;
+    
+    // Check all 4 edges of the square
+    const edges = [
+      [corners[0], corners[1]],
+      [corners[1], corners[2]], 
+      [corners[2], corners[3]],
+      [corners[3], corners[0]]
+    ];
+    
+    return edges.some(([edgeStart, edgeEnd]) => 
+      (this.arePointsEqual(edgeStart, lineStart) && this.arePointsEqual(edgeEnd, lineEnd)) ||
+      (this.arePointsEqual(edgeStart, lineEnd) && this.arePointsEqual(edgeEnd, lineStart))
+    );
+  }
+
+  /**
+   * Determines the orientation of a line (x, y, or z axis)
+   */
+  private getLineOrientation(start: Point3D, end: Point3D): 'x' | 'y' | 'z' | null {
+    const dx = Math.abs(start.x - end.x);
+    const dy = Math.abs(start.y - end.y);
+    const dz = Math.abs(start.z - end.z);
+    
+    if (dx === 1 && dy === 0 && dz === 0) return 'x';
+    if (dx === 0 && dy === 1 && dz === 0) return 'y';
+    if (dx === 0 && dy === 0 && dz === 1) return 'z';
+    
+    return null; // Not a valid line
+  }
+
+  /**
+   * Gets the six faces of a cube at the given position (copied from GameUtils)
+   */
+  private getCubeFaces(position: Point3D): { corners: Point3D[] }[] {
+    const { x, y, z } = position;
+    
+    return [
+      // Front face (z)
+      { corners: [{ x, y, z }, { x: x + 1, y, z }, { x: x + 1, y: y + 1, z }, { x, y: y + 1, z }] },
+      // Back face (z+1)  
+      { corners: [{ x, y, z: z + 1 }, { x: x + 1, y, z: z + 1 }, { x: x + 1, y: y + 1, z: z + 1 }, { x, y: y + 1, z: z + 1 }] },
+      // Left face (x)
+      { corners: [{ x, y, z }, { x, y: y + 1, z }, { x, y: y + 1, z: z + 1 }, { x, y, z: z + 1 }] },
+      // Right face (x+1)
+      { corners: [{ x: x + 1, y, z }, { x: x + 1, y: y + 1, z }, { x: x + 1, y: y + 1, z: z + 1 }, { x: x + 1, y, z: z + 1 }] },
+      // Bottom face (y)
+      { corners: [{ x, y, z }, { x: x + 1, y, z }, { x: x + 1, y, z: z + 1 }, { x, y, z: z + 1 }] },
+      // Top face (y+1)
+      { corners: [{ x, y: y + 1, z }, { x: x + 1, y: y + 1, z }, { x: x + 1, y: y + 1, z: z + 1 }, { x, y: y + 1, z: z + 1 }] }
+    ];
   }
 
   /**
