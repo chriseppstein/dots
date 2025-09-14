@@ -23,6 +23,9 @@ npm run test:coverage # Run tests with coverage report
 vitest [pattern]     # Run specific test files matching pattern
 ```
 
+**TDD Process:**
+All development must follow Test-Driven Development methodology. See [docs/TDD-Process-Instructions.md](docs/TDD-Process-Instructions.md) for comprehensive process guidelines.
+
 ## Core Architecture
 
 **Cubes** is a 3D version of Dots and Boxes where players compete to claim cubes by capturing their faces.
@@ -143,23 +146,38 @@ This ensures:
 
 Use `npx tsc --noEmit` to check for type errors without generating JavaScript output.
 
-### TDD Methodology for Bug Fixes
-**CRITICAL**: Always use Test-Driven Development for bug fixes. Bug fixes should NEVER be implemented without first creating failing tests that reproduce the problem.
+### TDD Methodology - Mandatory Process
+**CRITICAL**: Always use Test-Driven Development for both new features and bug fixes. Implementation should NEVER begin without first creating failing tests.
 
-**Required workflow for bug fixes:**
-1. **Use the TDD methodology guide agent** to ensure proper TDD workflow
-2. **Write failing tests first** that reproduce the bug behavior
-3. **Verify tests fail** with the current broken code
-4. **Implement the minimal fix** to make tests pass
-5. **Refactor if needed** while keeping tests green
+**Claude Code must follow the comprehensive TDD process documented in [docs/TDD-Process-Instructions.md](docs/TDD-Process-Instructions.md)**
+
+**Core TDD Requirements:**
+1. **Write failing tests first** - for both features and bug fixes
+2. **Follow Red-Green-Refactor cycle** strictly
+3. **Verify tests fail** before implementing solutions
+4. **Write minimal code** to make tests pass
+5. **Refactor while keeping tests green**
+
+**For New Features:**
+- Break down features into small, testable behaviors
+- Plan test structure before writing any code
+- Implement incrementally, one test at a time
+- Focus on public interfaces and behavior, not implementation
+
+**For Bug Fixes:**
+- Write failing tests that reproduce the bug
+- Verify tests fail with current broken code  
+- Fix with minimal changes to pass tests
+- Use tests as regression prevention
 
 This ensures:
-- Bugs are properly documented and understood
-- Fixes actually solve the root problem
-- Regression prevention through comprehensive test coverage
-- Code quality improvements through the red-green-refactor cycle
+- Higher code quality through comprehensive testing
+- Better design driven by testability requirements
+- Faster debugging with immediate feedback
+- Regression prevention through automated test suites
+- Living documentation that stays current
 
-**Never skip TDD for bug fixes** - the test-first approach catches edge cases and prevents incomplete solutions.
+**Reference the full TDD process guide at [docs/TDD-Process-Instructions.md](docs/TDD-Process-Instructions.md) for detailed workflows, best practices, and examples.**
 
 ### Testing Before Commits
 **IMPORTANT**: Always ensure all tests pass before committing code. Commits with failing tests make it difficult to use `git bisect` for debugging and can break CI/CD pipelines. Run `npm test` and fix any failures before committing.
