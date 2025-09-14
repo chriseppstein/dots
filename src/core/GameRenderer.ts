@@ -193,7 +193,7 @@ export class GameRenderer {
     if (event.button === 0) {
       const line = this.getHoveredLine();
       if (line) {
-        this.handleLineClick(line);
+        this.handleLineClick(line, event.shiftKey);
         return; // Don't start dragging on left click
       }
     }
@@ -694,7 +694,18 @@ export class GameRenderer {
     requestAnimationFrame(animationLoop);
   }
 
-  private handleLineClick(line: Line): void {
+  private handleLineClick(line: Line, isShiftHeld: boolean = false): void {
+    // If Shift is held, print line coordinates to console for debugging
+    if (isShiftHeld) {
+      console.log('🔍 DEBUG: Line coordinates:', {
+        start: { x: line.start.x, y: line.start.y, z: line.start.z },
+        end: { x: line.end.x, y: line.end.y, z: line.end.z },
+        isDrawn: this.isLineDrawn(line)
+      });
+      return;
+    }
+    
+    // Normal line click behavior
     if (this.lineClickCallback && !this.isLineDrawn(line)) {
       this.lineClickCallback(line.start, line.end);
     }
