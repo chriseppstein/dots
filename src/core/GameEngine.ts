@@ -17,8 +17,8 @@ export class GameEngine {
   private commandHistory: IGameCommand[] = [];
   private listeners: Array<(command: IGameCommand, oldState: GameState, newState: GameState) => void> = [];
 
-  constructor(gridSize: GridSize = 4, gameMode: GameMode = 'local') {
-    this.state = this.initializeGameState(gridSize, gameMode);
+  constructor(gridSize: GridSize = 4, gameMode: GameMode = 'local', autoplayChainReactions: boolean = false) {
+    this.state = this.initializeGameState(gridSize, gameMode, autoplayChainReactions);
     this.initializeDots();
     this.initializeCubes();
     // Initialize the drawnLinesSet with any existing lines (should be empty initially)
@@ -27,7 +27,7 @@ export class GameEngine {
     }
   }
 
-  private initializeGameState(gridSize: GridSize, gameMode: GameMode): GameState {
+  private initializeGameState(gridSize: GridSize, gameMode: GameMode, autoplayChainReactions: boolean = false): GameState {
     // Check if running in server environment (no window object)
     const isServer = typeof window === 'undefined';
     
@@ -58,7 +58,8 @@ export class GameEngine {
       cubes: [],
       gameMode,
       winner: null,
-      turn: 0
+      turn: 0,
+      autoplayChainReactions
     };
   }
 
@@ -274,10 +275,10 @@ export class GameEngine {
     }
   }
 
-  public makeMove(start: Point3D, end: Point3D): boolean {
-    // TODO: Migrate to command pattern in future
-    // For now, use original implementation to maintain compatibility
-    
+  /**
+   * Check if a move is valid without executing it
+   */
+  public isValidMove(start: Point3D, end: Point3D): boolean {
     if (this.state.winner) return false;
 
     const line: Line = { start, end, player: this.state.currentPlayer };
@@ -286,9 +287,36 @@ export class GameEngine {
       return false;
     }
 
-    if (!this.isValidLine(line)) {
+    return this.isValidLine(line);
+  }
+
+  /**
+   * Initialize the game with a specific state (for testing)
+   */
+  public initializeWithState(state: GameState): void {
+    this.state = { ...state };
+    this.moveHistory = [];
+    this.drawnLinesSet.clear();
+    
+    // Rebuild the drawnLinesSet from the state
+    for (const line of this.state.lines) {
+      this.drawnLinesSet.add(this.getLineKey(line));
+    }
+  }
+
+  public loadFromState(state: GameState): void {
+    this.initializeWithState(state);
+  }
+
+  public makeMove(start: Point3D, end: Point3D): boolean {
+    // TODO: Migrate to command pattern in future
+    // For now, use original implementation to maintain compatibility
+    
+    if (!this.isValidMove(start, end)) {
       return false;
     }
+
+    const line: Line = { start, end, player: this.state.currentPlayer };
 
     // Store the previous state for validation
     const previousState = { ...this.state };
@@ -460,6 +488,13 @@ export class GameEngine {
   private switchPlayer(): void {
     const currentIndex = this.state.players.indexOf(this.state.currentPlayer);
     this.state.currentPlayer = this.state.players[(currentIndex + 1) % this.state.players.length];
+  }
+
+  /**
+   * Force a turn switch (used by chain reaction controller)
+   */
+  public forceTurnSwitch(): void {
+    this.switchPlayer();
   }
 
   private checkWinCondition(): void {
