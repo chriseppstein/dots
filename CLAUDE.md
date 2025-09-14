@@ -143,6 +143,24 @@ This ensures:
 
 Use `npx tsc --noEmit` to check for type errors without generating JavaScript output.
 
+### TDD Methodology for Bug Fixes
+**CRITICAL**: Always use Test-Driven Development for bug fixes. Bug fixes should NEVER be implemented without first creating failing tests that reproduce the problem.
+
+**Required workflow for bug fixes:**
+1. **Use the TDD methodology guide agent** to ensure proper TDD workflow
+2. **Write failing tests first** that reproduce the bug behavior
+3. **Verify tests fail** with the current broken code
+4. **Implement the minimal fix** to make tests pass
+5. **Refactor if needed** while keeping tests green
+
+This ensures:
+- Bugs are properly documented and understood
+- Fixes actually solve the root problem
+- Regression prevention through comprehensive test coverage
+- Code quality improvements through the red-green-refactor cycle
+
+**Never skip TDD for bug fixes** - the test-first approach catches edge cases and prevents incomplete solutions.
+
 ### Testing Before Commits
 **IMPORTANT**: Always ensure all tests pass before committing code. Commits with failing tests make it difficult to use `git bisect` for debugging and can break CI/CD pipelines. Run `npm test` and fix any failures before committing.
 
