@@ -462,7 +462,8 @@ export class StateValidator {
     // (This is implicitly validated by the unique square counting)
 
     // Invariant 4: Lines should be within grid bounds
-    const maxLines = 3 * state.gridSize * Math.pow(state.gridSize - 1, 2);
+    const n = state.gridSize;
+    const maxLines = 3 * n * n * (n-1);
     if (state.lines.length > maxLines) {
       errors.push({ 
         code: 'TOO_MANY_LINES', 

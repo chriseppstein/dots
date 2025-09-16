@@ -11,6 +11,7 @@ interface GameToken {
 export class GameSetup extends HTMLElement {
   private selectedGridSize: GridSize = 4;
   private selectedGameMode: GameMode = 'local';
+  private autoplayChainReactions: boolean = false;
   private currentStep: 'mode-selection' | 'game-setup' | 'waiting-room' = 'mode-selection';
   private networkManager: NetworkManager | null = null;
   private gameRoomUrl: string = '';
@@ -177,6 +178,37 @@ export class GameSetup extends HTMLElement {
           background: rgba(255, 255, 255, 0.2);
         }
         
+        .checkbox-group {
+          margin-top: 1rem;
+        }
+        
+        .checkbox-wrapper {
+          display: flex;
+          align-items: center;
+          margin-top: 0.5rem;
+          cursor: pointer;
+        }
+        
+        input[type="checkbox"] {
+          margin-right: 0.75rem;
+          transform: scale(1.2);
+          cursor: pointer;
+        }
+        
+        .checkbox-label {
+          font-size: 1rem;
+          cursor: pointer;
+          flex: 1;
+        }
+        
+        .checkbox-description {
+          font-size: 0.85rem;
+          opacity: 0.8;
+          margin-top: 0.25rem;
+          margin-left: 2rem;
+          line-height: 1.3;
+        }
+        
         .url-display {
           background: rgba(255, 255, 255, 0.1);
           padding: 1rem;
@@ -274,6 +306,19 @@ export class GameSetup extends HTMLElement {
       </div>
       
       ${playerNameSection}
+      
+      <div class="setup-group">
+        <label>Game Options</label>
+        <div class="checkbox-group">
+          <div class="checkbox-wrapper" id="autoplay-wrapper">
+            <input type="checkbox" id="autoplay-chain-reactions" ${this.autoplayChainReactions ? 'checked' : ''}>
+            <label for="autoplay-chain-reactions" class="checkbox-label">Autoplay Chain Reactions</label>
+          </div>
+          <div class="checkbox-description">
+            When enabled, the computer automatically continues playing for you after completing a square to claim additional squares in a chain.
+          </div>
+        </div>
+      </div>
       
       <button class="primary-button" id="create-game">Create Game</button>
       <button class="secondary-button" id="back-button">← Back</button>
@@ -390,6 +435,16 @@ export class GameSetup extends HTMLElement {
       });
     });
     
+    // Autoplay chain reactions checkbox
+    const autoplayCheckbox = this.shadowRoot.querySelector('#autoplay-chain-reactions');
+    if (autoplayCheckbox) {
+      autoplayCheckbox.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        this.autoplayChainReactions = target.checked;
+        console.log('☑️ GameSetup: Autoplay checkbox changed to', this.autoplayChainReactions);
+      });
+    }
+    
     // Create game button
     const createGameButton = this.shadowRoot.querySelector('#create-game');
     if (createGameButton) {
@@ -438,12 +493,14 @@ export class GameSetup extends HTMLElement {
         ? 'Computer' 
         : (player2Input?.value.trim() || 'Player 2');
       
+      console.log('🎮 GameSetup: Dispatching gamestart event with autoplay =', this.autoplayChainReactions);
       this.dispatchEvent(new CustomEvent('gamestart', {
         detail: {
           gridSize: this.selectedGridSize,
           gameMode: this.selectedGameMode,
           player1Name,
-          player2Name
+          player2Name,
+          autoplayChainReactions: this.autoplayChainReactions
         }
       }));
     }
@@ -493,7 +550,8 @@ export class GameSetup extends HTMLElement {
             player1Name: gameState.players[0].name,
             player2Name: gameState.players[1].name,
             networkManager: this.networkManager,
-            gameState: gameState
+            gameState: gameState,
+            autoplayChainReactions: this.autoplayChainReactions
           }
         }));
       });
@@ -578,7 +636,8 @@ export class GameSetup extends HTMLElement {
                 player1Name: gameState.players[0].name,
                 player2Name: gameState.players[1].name,
                 networkManager: this.networkManager,
-                gameState: gameState
+                gameState: gameState,
+                autoplayChainReactions: this.autoplayChainReactions
               }
             }));
           });
@@ -602,7 +661,8 @@ export class GameSetup extends HTMLElement {
               player1Name: existingToken.playerName,
               player2Name: 'Opponent',
               networkManager: this.networkManager,
-              rejoining: true
+              rejoining: true,
+              autoplayChainReactions: this.autoplayChainReactions
             }
           }));
         }
@@ -1114,7 +1174,8 @@ export class GameSetup extends HTMLElement {
             player1Name: gameState.players[0].name,
             player2Name: gameState.players[1].name,
             networkManager: this.networkManager,
-            gameState: gameState
+            gameState: gameState,
+            autoplayChainReactions: this.autoplayChainReactions
           }
         }));
       });
@@ -1149,6 +1210,7 @@ export class GameSetup extends HTMLElement {
     this.currentStep = 'mode-selection';
     this.selectedGameMode = 'local' as GameMode;
     this.selectedGridSize = 4;
+    this.autoplayChainReactions = false;
     
     // Re-render to initial state
     this.render();

@@ -161,11 +161,11 @@ export function calculateScore(state: GameState): ScoreResult {
     }
   }
 
-  // Count unique squares from cube faces using Set to avoid duplicates
+  // Count unique squares from both state.squares and cube faces using Set to avoid duplicates
   const uniqueSquares = new Set<string>();
   
-  // Get all squares from cube faces
-  const allSquares: Square[] = [];
+  // Get all squares from state.squares and cube faces
+  const allSquares: Square[] = [...state.squares];
   for (const cube of state.cubes) {
     allSquares.push(...cube.faces);
   }

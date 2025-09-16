@@ -191,7 +191,7 @@ export class GameBoard extends HTMLElement implements StateChangeListener {
     this.renderContainer = this.shadowRoot.querySelector('#render-container') as HTMLDivElement;
   }
 
-  public startGame(gridSize: GridSize, gameMode: GameMode, player1Name: string, player2Name: string, networkManager?: NetworkManager, gameState?: any) {
+  public startGame(gridSize: GridSize, gameMode: GameMode, player1Name: string, player2Name: string, networkManager?: NetworkManager, gameState?: any, autoplayChainReactions?: boolean) {
     // Clean up previous game
     if (this.renderer) {
       this.renderer.dispose();
@@ -206,10 +206,32 @@ export class GameBoard extends HTMLElement implements StateChangeListener {
     
     // Create the game controller (handles logic without rendering)
     this.networkManager = networkManager;
-    this.controller = new GameController(gridSize, gameMode, player1Name, player2Name, networkManager);
+    this.controller = new GameController(gridSize, gameMode, player1Name, player2Name, networkManager, autoplayChainReactions);
     
     // Register as state change listener
     this.controller.getStateManager().addListener(this);
+    
+    // Register chain reaction listeners for UI updates during autoplay
+    const chainController = this.controller.getChainController();
+    if (chainController) {
+      chainController.onChainMove((event) => {
+        console.log('🔗 Chain move:', event.move, 'by', event.player.name, '(automated:', event.isAutomated + ')');
+        // Force UI update after each chain move
+        if (this.renderer) {
+          this.renderer.updateFromGameState(this.controller!.getState());
+        }
+        this.updateHUD();
+      });
+      
+      chainController.onChainComplete((event) => {
+        console.log('✅ Chain complete:', event.totalMoves, 'moves by', event.player.name);
+        // Final UI update after chain completion
+        if (this.renderer) {
+          this.renderer.updateFromGameState(this.controller!.getState());
+        }
+        this.updateHUD();
+      });
+    }
     
     // Only create renderer if we have a render container (not in test environment)
     if (this.renderContainer) {

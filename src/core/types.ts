@@ -46,6 +46,7 @@ export interface GameState {
   winner: Player | null;
   turn: number;
   lastMove?: Line;
+  autoplayChainReactions?: boolean;
 }
 
 export interface GameMove {

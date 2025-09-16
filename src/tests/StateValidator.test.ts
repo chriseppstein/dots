@@ -378,9 +378,9 @@ describe('StateValidator', () => {
     });
     
     it('should enforce maximum lines invariant', () => {
-      // For a 3x3x3 grid, max lines = 3 * 3 * (3-1)² = 3 * 3 * 4 = 36
+      // For a 3x3x3 grid, max lines = 3 * n * n * (n-1) = 3 * 3 * 3 * 2 = 54
       const lines: Line[] = [];
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 60; i++) { // Create more lines than the new maximum
         lines.push({
           start: { x: 0, y: 0, z: 0 },
           end: { x: 1, y: 0, z: 0 },

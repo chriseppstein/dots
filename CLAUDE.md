@@ -26,6 +26,27 @@ vitest [pattern]     # Run specific test files matching pattern
 **TDD Process:**
 All development must follow Test-Driven Development methodology. See [docs/TDD-Process-Instructions.md](docs/TDD-Process-Instructions.md) for comprehensive process guidelines.
 
+## CRITICAL TEST WRITING PRINCIPLE
+
+**NEVER write tests that pass when bugs exist.** Always write tests that:
+- ✅ **PASS** when the application functions correctly
+- ❌ **FAIL** when bugs are present
+
+This means:
+- Write tests that assert correct behavior
+- Let tests fail when bugs exist, then fix the bugs to make tests pass
+- NEVER write `expect(bugExists).toBe(true)` or similar assertions
+- NEVER write tests designed to "document" bugs by passing when broken
+
+Example:
+```typescript
+// ❌ WRONG - test passes when bug exists
+expect(autoplayTriggeredIncorrectly).toBe(true);
+
+// ✅ CORRECT - test fails when bug exists, passes when fixed
+expect(autoplayOnlyTriggersForCorrectPlayer).toBe(true);
+```
+
 ## Core Architecture
 
 **Cubes** is a 3D version of Dots and Boxes where players compete to claim cubes by capturing their faces.

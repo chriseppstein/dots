@@ -20,8 +20,8 @@ class CubesApp {
     
     if (gameSetup) {
       gameSetup.addEventListener('gamestart', (event: any) => {
-        const { gridSize, gameMode, player1Name, player2Name, networkManager, gameState } = event.detail;
-        this.startGame(gridSize, gameMode, player1Name, player2Name, networkManager, gameState);
+        const { gridSize, gameMode, player1Name, player2Name, networkManager, gameState, autoplayChainReactions } = event.detail;
+        this.startGame(gridSize, gameMode, player1Name, player2Name, networkManager, gameState, autoplayChainReactions);
       });
     }
     
@@ -32,11 +32,11 @@ class CubesApp {
     }
   }
 
-  private startGame(gridSize: GridSize, gameMode: GameMode, player1Name: string, player2Name: string, networkManager?: any, gameState?: any) {
+  private startGame(gridSize: GridSize, gameMode: GameMode, player1Name: string, player2Name: string, networkManager?: any, gameState?: any, autoplayChainReactions?: boolean) {
     this.setupScreen.style.display = 'none';
     this.gameScreen.style.display = 'block';
     
-    this.gameBoard.startGame(gridSize, gameMode, player1Name, player2Name, networkManager, gameState);
+    this.gameBoard.startGame(gridSize, gameMode, player1Name, player2Name, networkManager, gameState, autoplayChainReactions);
   }
 
   private showSetupScreen() {

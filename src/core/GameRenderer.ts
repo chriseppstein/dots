@@ -774,7 +774,14 @@ export class GameRenderer {
     // Add new lines or update existing ones that changed (e.g., highlighting)
     for (const [key, { line, isLastMove }] of currentLines) {
       const existingMesh = this.drawnLines.get(key);
-      const color = line.player?.color ? parseInt(line.player.color.replace('#', '0x')) : 0xffffff;
+      // Determine line color by finding the player in the game state
+      let color = 0xffffff; // Default white
+      if (line.player?.id && state.players) {
+        const player = state.players.find(p => p.id === line.player?.id);
+        if (player?.color) {
+          color = parseInt(player.color.replace('#', ''), 16);
+        }
+      }
       
       // Existing drawn lines always use full opacity (1.0) - they keep their player color
       const baseOpacity = 1.0;
@@ -972,7 +979,7 @@ export class GameRenderer {
     geometry.computeVertexNormals();
     
     const material = new THREE.MeshPhongMaterial({
-      color: parseInt(color.replace('#', '0x')),
+      color: parseInt(color.replace('#', ''), 16),
       opacity: this.squareOpacity,
       transparent: true,
       side: THREE.DoubleSide
@@ -989,7 +996,7 @@ export class GameRenderer {
     // Create a sphere in the center of the cube
     const geometry = new THREE.SphereGeometry(0.3, 16, 16);
     const material = new THREE.MeshPhongMaterial({
-      color: parseInt(color.replace('#', '0x')),
+      color: parseInt(color.replace('#', ''), 16),
       opacity: 0.9,
       transparent: true
     });

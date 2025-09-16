@@ -1,10 +1,10 @@
 {
-  "timestamp": "2025-09-14T18:51:26.443Z",
+  "timestamp": "2025-09-14T19:45:03.311Z",
   "gameState": {
     "gridSize": 4,
     "currentPlayer": {
       "id": "player2",
-      "name": "Wil",
+      "name": "Player 2",
       "color": "#87CEEB",
       "score": 0,
       "squareCount": 0,
@@ -13,14 +13,14 @@
     "players": [
       {
         "id": "player1",
-        "name": "Chris",
+        "name": "Player 1",
         "color": "#9932CC",
         "score": 0,
-        "squareCount": 0
+        "squareCount": 1
       },
       {
         "id": "player2",
-        "name": "Wil",
+        "name": "Player 2",
         "color": "#87CEEB",
         "score": 0,
         "squareCount": 0,
@@ -41,10 +41,10 @@
         },
         "player": {
           "id": "player1",
-          "name": "Chris",
+          "name": "Player 1",
           "color": "#9932CC",
           "score": 0,
-          "squareCount": 0
+          "squareCount": 1
         }
       },
       {
@@ -60,30 +60,11 @@
         },
         "player": {
           "id": "player2",
-          "name": "Wil",
+          "name": "Player 2",
           "color": "#87CEEB",
           "score": 0,
           "squareCount": 0,
           "isAI": false
-        }
-      },
-      {
-        "start": {
-          "x": 0,
-          "y": 0,
-          "z": 2
-        },
-        "end": {
-          "x": 0,
-          "y": 0,
-          "z": 3
-        },
-        "player": {
-          "id": "player1",
-          "name": "Chris",
-          "color": "#9932CC",
-          "score": 0,
-          "squareCount": 0
         }
       },
       {
@@ -98,12 +79,11 @@
           "z": 3
         },
         "player": {
-          "id": "player2",
-          "name": "Wil",
-          "color": "#87CEEB",
+          "id": "player1",
+          "name": "Player 1",
+          "color": "#9932CC",
           "score": 0,
-          "squareCount": 0,
-          "isAI": false
+          "squareCount": 1
         }
       },
       {
@@ -118,27 +98,8 @@
           "z": 3
         },
         "player": {
-          "id": "player1",
-          "name": "Chris",
-          "color": "#9932CC",
-          "score": 0,
-          "squareCount": 0
-        }
-      },
-      {
-        "start": {
-          "x": 1,
-          "y": 1,
-          "z": 3
-        },
-        "end": {
-          "x": 1,
-          "y": 2,
-          "z": 3
-        },
-        "player": {
           "id": "player2",
-          "name": "Wil",
+          "name": "Player 2",
           "color": "#87CEEB",
           "score": 0,
           "squareCount": 0,
@@ -148,75 +109,75 @@
       {
         "start": {
           "x": 1,
-          "y": 2,
+          "y": 0,
           "z": 3
         },
         "end": {
           "x": 2,
-          "y": 2,
+          "y": 0,
           "z": 3
         },
         "player": {
           "id": "player1",
-          "name": "Chris",
+          "name": "Player 1",
           "color": "#9932CC",
           "score": 0,
-          "squareCount": 0
+          "squareCount": 1
         }
       },
       {
         "start": {
           "x": 2,
-          "y": 2,
-          "z": 3
-        },
-        "end": {
-          "x": 2,
-          "y": 3,
-          "z": 3
-        },
-        "player": {
-          "id": "player2",
-          "name": "Wil",
-          "color": "#87CEEB",
-          "score": 0,
-          "squareCount": 0,
-          "isAI": false
-        }
-      },
-      {
-        "start": {
-          "x": 0,
-          "y": 3,
-          "z": 3
-        },
-        "end": {
-          "x": 1,
-          "y": 3,
-          "z": 3
-        },
-        "player": {
-          "id": "player1",
-          "name": "Chris",
-          "color": "#9932CC",
-          "score": 0,
-          "squareCount": 0
-        }
-      },
-      {
-        "start": {
-          "x": 2,
-          "y": 3,
+          "y": 0,
           "z": 3
         },
         "end": {
           "x": 3,
-          "y": 3,
+          "y": 0,
           "z": 3
         },
         "player": {
           "id": "player2",
-          "name": "Wil",
+          "name": "Player 2",
+          "color": "#87CEEB",
+          "score": 0,
+          "squareCount": 0,
+          "isAI": false
+        }
+      },
+      {
+        "start": {
+          "x": 3,
+          "y": 0,
+          "z": 3
+        },
+        "end": {
+          "x": 3,
+          "y": 1,
+          "z": 3
+        },
+        "player": {
+          "id": "player1",
+          "name": "Player 1",
+          "color": "#9932CC",
+          "score": 0,
+          "squareCount": 1
+        }
+      },
+      {
+        "start": {
+          "x": 2,
+          "y": 2,
+          "z": 1
+        },
+        "end": {
+          "x": 3,
+          "y": 2,
+          "z": 1
+        },
+        "player": {
+          "id": "player2",
+          "name": "Player 2",
           "color": "#87CEEB",
           "score": 0,
           "squareCount": 0,
@@ -236,26 +197,26 @@
         },
         "player": {
           "id": "player1",
-          "name": "Chris",
+          "name": "Player 1",
           "color": "#9932CC",
           "score": 0,
-          "squareCount": 0
+          "squareCount": 1
         }
       },
       {
         "start": {
-          "x": 2,
-          "y": 1,
+          "x": 3,
+          "y": 2,
           "z": 3
         },
         "end": {
           "x": 3,
-          "y": 1,
+          "y": 3,
           "z": 3
         },
         "player": {
           "id": "player2",
-          "name": "Wil",
+          "name": "Player 2",
           "color": "#87CEEB",
           "score": 0,
           "squareCount": 0,
@@ -265,40 +226,20 @@
       {
         "start": {
           "x": 2,
-          "y": 0,
+          "y": 3,
           "z": 3
         },
         "end": {
-          "x": 2,
-          "y": 1,
+          "x": 3,
+          "y": 3,
           "z": 3
         },
         "player": {
           "id": "player1",
-          "name": "Chris",
+          "name": "Player 1",
           "color": "#9932CC",
           "score": 0,
-          "squareCount": 0
-        }
-      },
-      {
-        "start": {
-          "x": 1,
-          "y": 0,
-          "z": 3
-        },
-        "end": {
-          "x": 2,
-          "y": 0,
-          "z": 3
-        },
-        "player": {
-          "id": "player2",
-          "name": "Wil",
-          "color": "#87CEEB",
-          "score": 0,
-          "squareCount": 0,
-          "isAI": false
+          "squareCount": 1
         }
       },
       {
@@ -313,11 +254,109 @@
           "z": 3
         },
         "player": {
+          "id": "player2",
+          "name": "Player 2",
+          "color": "#87CEEB",
+          "score": 0,
+          "squareCount": 0,
+          "isAI": false
+        }
+      },
+      {
+        "start": {
+          "x": 0,
+          "y": 3,
+          "z": 3
+        },
+        "end": {
+          "x": 1,
+          "y": 3,
+          "z": 3
+        },
+        "player": {
           "id": "player1",
-          "name": "Chris",
+          "name": "Player 1",
           "color": "#9932CC",
           "score": 0,
-          "squareCount": 0
+          "squareCount": 1
+        }
+      },
+      {
+        "start": {
+          "x": 1,
+          "y": 1,
+          "z": 3
+        },
+        "end": {
+          "x": 1,
+          "y": 2,
+          "z": 3
+        },
+        "player": {
+          "id": "player2",
+          "name": "Player 2",
+          "color": "#87CEEB",
+          "score": 0,
+          "squareCount": 0,
+          "isAI": false
+        }
+      },
+      {
+        "start": {
+          "x": 1,
+          "y": 1,
+          "z": 3
+        },
+        "end": {
+          "x": 2,
+          "y": 1,
+          "z": 3
+        },
+        "player": {
+          "id": "player1",
+          "name": "Player 1",
+          "color": "#9932CC",
+          "score": 0,
+          "squareCount": 1
+        }
+      },
+      {
+        "start": {
+          "x": 2,
+          "y": 1,
+          "z": 3
+        },
+        "end": {
+          "x": 2,
+          "y": 2,
+          "z": 3
+        },
+        "player": {
+          "id": "player2",
+          "name": "Player 2",
+          "color": "#87CEEB",
+          "score": 0,
+          "squareCount": 0,
+          "isAI": false
+        }
+      },
+      {
+        "start": {
+          "x": 1,
+          "y": 2,
+          "z": 3
+        },
+        "end": {
+          "x": 2,
+          "y": 2,
+          "z": 3
+        },
+        "player": {
+          "id": "player1",
+          "name": "Player 1",
+          "color": "#9932CC",
+          "score": 0,
+          "squareCount": 1
         }
       }
     ],
@@ -7275,7 +7314,13 @@
                 "player": null
               }
             ],
-            "player": null
+            "player": {
+              "id": "player1",
+              "name": "Player 1",
+              "color": "#9932CC",
+              "score": 0,
+              "squareCount": 1
+            }
           },
           {
             "corners": [
@@ -7595,7 +7640,7 @@
           }
         ],
         "owner": null,
-        "claimedFaces": 0
+        "claimedFaces": 1
       },
       {
         "position": {
@@ -13420,30 +13465,30 @@
     ],
     "gameMode": "local",
     "winner": null,
-    "turn": 15,
+    "turn": 17,
     "autoplayChainReactions": true,
     "lastMove": {
       "start": {
         "x": 1,
-        "y": 3,
+        "y": 2,
         "z": 3
       },
       "end": {
         "x": 2,
-        "y": 3,
+        "y": 2,
         "z": 3
       },
       "player": {
         "id": "player1",
-        "name": "Chris",
+        "name": "Player 1",
         "color": "#9932CC",
         "score": 0,
-        "squareCount": 0
+        "squareCount": 1
       }
     }
   },
   "rendererState": {
-    "lastRenderTimestamp": 1757875886443,
+    "lastRenderTimestamp": 1757879103311,
     "hasPreviewLine": false
   },
   "networkState": null,

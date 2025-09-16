@@ -6,6 +6,7 @@ import { GridSize, GameMode, Point3D, GameState } from './types';
 import { PlayerIdentityService } from './PlayerIdentityService';
 import { GameStateManager, StateChangeListener } from './GameStateManager';
 import { ResourceManager } from './ResourceManager';
+import { ChainReactionController } from './ChainReactionController';
 
 /**
  * GameController manages game logic and state without requiring rendering.
@@ -17,6 +18,7 @@ export class GameController implements StateChangeListener {
   private renderer?: GameRenderer;
   private networkManager?: NetworkManager;
   private aiPlayer?: AIPlayer;
+  private chainController?: ChainReactionController;
   private player1Name: string = 'Player 1';
   private player2Name: string = 'Player 2';
   private gameMode: GameMode;
@@ -29,9 +31,11 @@ export class GameController implements StateChangeListener {
     gameMode: GameMode,
     player1Name: string,
     player2Name: string,
-    networkManager?: NetworkManager
+    networkManager?: NetworkManager,
+    autoplayChainReactions?: boolean
   ) {
-    this.engine = new GameEngine(gridSize, gameMode);
+    console.log('🎯 GameController: Creating with autoplayChainReactions =', autoplayChainReactions);
+    this.engine = new GameEngine(gridSize, gameMode, autoplayChainReactions);
     this.stateManager = new GameStateManager(this.engine);
     this.gameMode = gameMode;
     this.player1Name = player1Name;
@@ -41,6 +45,14 @@ export class GameController implements StateChangeListener {
 
     if (gameMode === 'ai') {
       this.aiPlayer = new AIPlayer(this.engine);
+    }
+
+    // Create chain reaction controller if autoplay is enabled
+    if (autoplayChainReactions) {
+      console.log('⚡ GameController: Creating ChainReactionController');
+      this.chainController = new ChainReactionController(this.engine);
+    } else {
+      console.log('❌ GameController: NOT creating ChainReactionController (autoplay disabled)');
     }
 
     // Register self as state change listener
@@ -230,6 +242,46 @@ export class GameController implements StateChangeListener {
         }
       }
       
+      // Map line player IDs
+      if (mappedState.lines && state.lines) {
+        for (let i = 0; i < mappedState.lines.length; i++) {
+          if (mappedState.lines[i].player && state.lines[i].player) {
+            const engineId = state.lines[i].player.id;
+            const networkId = this.playerIdentityService.getNetworkId(engineId);
+            if (networkId) {
+              mappedState.lines[i].player.id = networkId;
+            }
+          }
+        }
+      }
+      
+      // Map cube owner and face player IDs
+      if (mappedState.cubes && state.cubes) {
+        for (let i = 0; i < mappedState.cubes.length; i++) {
+          // Map cube owner ID
+          if (mappedState.cubes[i].owner && state.cubes[i].owner) {
+            const engineId = state.cubes[i].owner.id;
+            const networkId = this.playerIdentityService.getNetworkId(engineId);
+            if (networkId) {
+              mappedState.cubes[i].owner.id = networkId;
+            }
+          }
+          
+          // Map face player IDs
+          if (mappedState.cubes[i].faces && state.cubes[i].faces) {
+            for (let j = 0; j < mappedState.cubes[i].faces.length; j++) {
+              if (mappedState.cubes[i].faces[j].player && state.cubes[i].faces[j].player) {
+                const engineId = state.cubes[i].faces[j].player.id;
+                const networkId = this.playerIdentityService.getNetworkId(engineId);
+                if (networkId) {
+                  mappedState.cubes[i].faces[j].player.id = networkId;
+                }
+              }
+            }
+          }
+        }
+      }
+      
       return mappedState;
     }
     
@@ -257,6 +309,13 @@ export class GameController implements StateChangeListener {
     return this.stateManager;
   }
 
+  /**
+   * Get the chain reaction controller for registering chain event listeners
+   */
+  public getChainController(): ChainReactionController | undefined {
+    return this.chainController;
+  }
+
   // StateChangeListener implementation
   
   /**
@@ -270,7 +329,28 @@ export class GameController implements StateChangeListener {
   /**
    * Called when a move is made
    */
-  public onMove(_start: Point3D, _end: Point3D, newState: GameState): void {
+  public onMove(start: Point3D, end: Point3D, newState: GameState): void {
+    // Handle chain reactions if enabled and the specific move completed a square
+    if (this.chainController && newState.autoplayChainReactions && !newState.winner) {
+      // FIXED: Check if the specific move that was just made completed a square
+      const moveCompletedSquare = this.chainController.hasChainOpportunity(start, end);
+      
+      if (moveCompletedSquare) {
+        // Only trigger autoplay if the move that was just made completed a square
+        const chainOpportunities = this.chainController.findChainOpportunities();
+        if (chainOpportunities.length > 0) {
+          console.log('🔗 GameController: Square completed by move, executing autoplay');
+          // Execute the chain reaction after a short delay to allow UI to update
+          this.resourceManager.setTimeout(async () => {
+            await this.chainController!.executeChainReaction();
+          }, 300);
+          return; // Don't process AI moves during chain reaction
+        }
+      } else {
+        console.log('🚫 GameController: Move did not complete square, no autoplay triggered');
+      }
+    }
+
     // Handle AI moves for AI game mode
     if (this.gameMode === 'ai' && !newState.winner && newState.currentPlayer.isAI) {
       // Clear any existing AI move timer
