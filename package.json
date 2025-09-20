@@ -1,5 +1,5 @@
 {
-  "name": "dots",
+  "name": "dots-3d",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -22,7 +22,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Dots 3D - A three-dimensional version of the classic Dots and Boxes game",
   "devDependencies": {
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.1",

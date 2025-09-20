@@ -1,6 +1,8 @@
-# Cubes - 3D Dots Game
+# Dots 3D
 
 A three-dimensional version of the classic Dots and Boxes game where players compete to claim cubes by capturing their faces.
+
+**Live Game**: [dots-3d.com](https://dots-3d.com)
 
 ## Features
 
@@ -40,7 +42,7 @@ Open http://localhost:3000 in your browser
 ```bash
 npm run server
 ```
-The server runs on port 3001
+The server runs on port 3002
 
 ## How to Play
 

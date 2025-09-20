@@ -49,7 +49,7 @@ expect(autoplayOnlyTriggersForCorrectPlayer).toBe(true);
 
 ## Core Architecture
 
-**Cubes** is a 3D version of Dots and Boxes where players compete to claim cubes by capturing their faces.
+**Dots 3D** is a 3D version of Dots and Boxes where players compete to claim cubes by capturing their faces.
 
 ### Game Engine (`src/core/GameEngine.ts`)
 Central game logic handling:
@@ -205,3 +205,14 @@ This ensures:
 
 ### Server Restart Rule
 **IMPORTANT**: Always restart the server (`npm run server`) after making changes to `server/server.ts`. The server maintains in-memory state for active game rooms, and old state can interfere with testing new code changes.
+
+## Production Domain
+
+**Domain**: [dots-3d.com](https://dots-3d.com)
+
+The game is deployed at dots-3d.com, providing a professional web presence for the 3D dots and boxes experience. This domain should be referenced in:
+- Production deployment configurations
+- Social sharing and marketing materials  
+- Any external documentation or references to the live game
+
+The domain name aligns with the game's "Dots 3D" branding and clearly indicates the three-dimensional nature of the gameplay.

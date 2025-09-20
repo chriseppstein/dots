@@ -930,7 +930,7 @@ export class GameSetup extends HTMLElement {
       <h2>🎮 Game Invitation</h2>
       
       <div class="invitation">
-        <div class="invitation-text">You've been invited to play Cubes by</div>
+        <div class="invitation-text">You've been invited to play Dots 3D by</div>
         <div class="player-name">${player1Name}</div>
         <div class="game-info">Grid Size: ${gridSize}×${gridSize}×${gridSize}</div>
       </div>
@@ -948,7 +948,7 @@ export class GameSetup extends HTMLElement {
       <div id="how-to-play-dialog" class="dialog-overlay" style="display: none;">
         <div class="dialog-content">
           <button class="close-dialog" id="close-dialog">✕</button>
-          <h3>📖 How to Play Cubes</h3>
+          <h3>📖 How to Play Dots 3D</h3>
           <div class="how-to-play-content">
             <p><strong>Objective:</strong> Capture more cubes than your opponent by completing their faces!</p>
             
