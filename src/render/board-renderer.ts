@@ -92,10 +92,12 @@ export class BoardRenderer {
   private thetaVel = 0;
   private phiVel = 0;
 
-  // pointer state
+  // pointer state — mouse: right button orbits, left button only selects;
+  // touch: one finger orbits/taps, two fingers pinch-zoom
   private pointers = new Map<number, { x: number; y: number }>();
   private dragging = false;
   private downPos: { x: number; y: number } | null = null;
+  private rightDrag: { x: number; y: number } | null = null;
   private pinchDistance: number | null = null;
   private hoveredEdge: number | null = null;
 
@@ -165,6 +167,13 @@ export class BoardRenderer {
     canvas.addEventListener('pointerup', this.onPointerUp);
     canvas.addEventListener('pointercancel', this.onPointerUp);
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
+    // the right button is the orbit control, not a context menu
+    canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    // leaving the canvas (e.g. onto a HUD panel) must clear the hover, or
+    // the highlight and consequence chip stick to the last-touched edge
+    canvas.addEventListener('pointerleave', () => {
+      if (!this.rightDrag && !this.dragging) this.setHovered(null);
+    });
 
     this.animate();
   }
@@ -461,7 +470,7 @@ export class BoardRenderer {
     this.hoveredEdge = edgeId;
     if (edgeId === null) {
       this.hoverMesh.visible = false;
-      this.renderer.domElement.style.cursor = 'grab';
+      if (!this.rightDrag) this.renderer.domElement.style.cursor = '';
       this.opts.onEdgeHover(null, null);
       return;
     }
@@ -491,6 +500,19 @@ export class BoardRenderer {
 
   private onPointerDown = (ev: PointerEvent): void => {
     this.renderer.domElement.setPointerCapture(ev.pointerId);
+
+    if (ev.pointerType !== 'touch') {
+      if (ev.button === 2) {
+        this.rightDrag = { x: ev.clientX, y: ev.clientY };
+        this.dragging = true;
+        this.setHovered(null);
+        this.renderer.domElement.style.cursor = 'grabbing';
+      } else if (ev.button === 0) {
+        this.downPos = { x: ev.clientX, y: ev.clientY };
+      }
+      return;
+    }
+
     this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     if (this.pointers.size === 1) {
       this.downPos = { x: ev.clientX, y: ev.clientY };
@@ -503,12 +525,21 @@ export class BoardRenderer {
   };
 
   private onPointerMove = (ev: PointerEvent): void => {
-    const prev = this.pointers.get(ev.pointerId);
-    if (!prev) {
-      // pure hover (mouse, no button)
-      this.setHovered(this.pick(ev.clientX, ev.clientY));
+    if (ev.pointerType !== 'touch') {
+      if (this.rightDrag) {
+        const dx = ev.clientX - this.rightDrag.x;
+        const dy = ev.clientY - this.rightDrag.y;
+        this.rightDrag = { x: ev.clientX, y: ev.clientY };
+        this.orbitBy(dx, dy);
+      } else {
+        // hover follows the mouse; the left button never drags the view
+        this.setHovered(this.pick(ev.clientX, ev.clientY));
+      }
       return;
     }
+
+    const prev = this.pointers.get(ev.pointerId);
+    if (!prev) return;
     const dx = ev.clientX - prev.x;
     const dy = ev.clientY - prev.y;
     this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
@@ -530,38 +561,58 @@ export class BoardRenderer {
     ) {
       this.dragging = true;
       this.setHovered(null);
-      this.renderer.domElement.style.cursor = 'grabbing';
     }
-    if (this.dragging) {
-      const rect = this.renderer.domElement.getBoundingClientRect();
-      this.thetaVel = (-dx / rect.width) * Math.PI * 1.6;
-      this.phiVel = (-dy / rect.height) * Math.PI * 1.2;
-      this.theta += this.thetaVel;
-      this.phi = THREE.MathUtils.clamp(this.phi + this.phiVel, 0.15, Math.PI - 0.15);
-    }
+    if (this.dragging) this.orbitBy(dx, dy);
   };
 
   private onPointerUp = (ev: PointerEvent): void => {
+    if (ev.pointerType !== 'touch') {
+      if (ev.button === 2) {
+        this.rightDrag = null;
+        this.dragging = false;
+        this.renderer.domElement.style.cursor = '';
+      } else if (ev.button === 0 && this.downPos) {
+        if (
+          Math.hypot(ev.clientX - this.downPos.x, ev.clientY - this.downPos.y) <=
+          DRAG_THRESHOLD_PX
+        ) {
+          const edge = this.pick(ev.clientX, ev.clientY);
+          if (edge !== null) this.opts.onEdgeSelect(edge);
+        }
+        this.downPos = null;
+      }
+      return;
+    }
+
     this.pointers.delete(ev.pointerId);
     this.pinchDistance = null;
     if (!this.dragging && this.downPos) {
       const edge = this.pick(ev.clientX, ev.clientY);
       if (edge !== null) {
         // touch flow: first tap previews, tap on the previewed edge confirms
-        if (ev.pointerType === 'touch' && this.hoveredEdge !== edge) {
+        if (this.hoveredEdge !== edge) {
           this.setHovered(edge);
         } else {
           this.opts.onEdgeSelect(edge);
-          if (ev.pointerType === 'touch') this.setHovered(null);
+          this.setHovered(null);
         }
-      } else if (ev.pointerType === 'touch') {
+      } else {
         this.setHovered(null);
       }
     }
     this.downPos = null;
     this.dragging = false;
-    this.renderer.domElement.style.cursor = 'grab';
   };
+
+  /** Shared orbit for right-drag and one-finger drag. Horizontal direction
+   *  is "grab the cube": dragging right spins the cube to the right. */
+  private orbitBy(dx: number, dy: number): void {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.thetaVel = (dx / rect.width) * Math.PI * 1.6;
+    this.phiVel = (-dy / rect.height) * Math.PI * 1.2;
+    this.theta += this.thetaVel;
+    this.phi = THREE.MathUtils.clamp(this.phi + this.phiVel, 0.15, Math.PI - 0.15);
+  }
 
   private onWheel = (ev: WheelEvent): void => {
     ev.preventDefault();
