@@ -1,13 +1,12 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  root: './src',
   build: {
-    outDir: '../dist',
-    emptyOutDir: true
+    outDir: 'dist',
+    emptyOutDir: true,
   },
   server: {
     port: 3000,
-    host: '0.0.0.0'
-  }
+    host: '0.0.0.0',
+  },
 });
