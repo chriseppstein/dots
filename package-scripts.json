@@ -1,0 +1,10 @@
+{
+  "build:worker": "npx tsc src/worker/index.ts --outDir dist-worker --target ES2022 --module ES2022 --moduleResolution bundler --allowSyntheticDefaultImports --esModuleInterop",
+  "deploy:dev": "wrangler deploy --env development",
+  "deploy:preview": "wrangler deploy --env preview",
+  "deploy:prod": "wrangler deploy",
+  "dev:worker": "wrangler dev --env development",
+  "dev:local": "concurrently \"npm run dev\" \"npm run dev:worker\"",
+  "wrangler:login": "wrangler login",
+  "wrangler:whoami": "wrangler whoami"
+}

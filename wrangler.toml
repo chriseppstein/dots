@@ -1,0 +1,37 @@
+name = "dots-3d"
+main = "./dist-worker/index.js"
+compatibility_date = "2025-01-13"
+compatibility_flags = ["nodejs_compat"]
+
+# Static assets
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+# Durable Objects for game rooms
+[[durable_objects.bindings]]
+name = "GAME_ROOMS"
+class_name = "GameRoom"
+script_name = "dots-3d"
+
+[durable_objects.migrations]
+tag = "v1"
+new_classes = ["GameRoom"]
+
+# Environment Variables
+[vars]
+ENVIRONMENT = "production"
+
+# Development environment
+[env.development]
+name = "dots-3d-dev"
+
+[env.development.vars]
+ENVIRONMENT = "development"
+
+# Preview environment
+[env.preview]
+name = "dots-3d-preview"
+
+[env.preview.vars]
+ENVIRONMENT = "preview"
