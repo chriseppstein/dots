@@ -6,6 +6,7 @@
     "types": ["@cloudflare/workers-types"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "noEmit": true,
     "strict": true,
