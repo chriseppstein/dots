@@ -53,7 +53,7 @@ const DRAWN_EDGE_RADIUS = 0.045;
 const PICK_RADIUS = 0.16;
 const FACE_OPACITY = 0.3;
 const CUBE_OPACITY = 0.16;
-const LAST_MOVE_FADE_MS = 4000;
+const LAST_MOVE_FLASH_MS = 900;
 const DRAG_THRESHOLD_PX = 6;
 
 const UP = new THREE.Object3D();
@@ -106,7 +106,7 @@ export class BoardRenderer {
   private pickMesh: THREE.InstancedMesh | null = null;
   private pickEdgeIds: number[] = [];
   private hoverMesh: THREE.Group;
-  private lastMoveMesh: THREE.Mesh;
+  private lastMoveMesh: THREE.Group;
   private lastMoveShownAt = 0;
   private lastMoveKey: number | null = null;
 
@@ -186,12 +186,25 @@ export class BoardRenderer {
       this.lastMoveKey = view.lastMove.edgeId;
       this.lastMoveShownAt = performance.now();
       const [a, b] = this.lat.edgeEndpoints(view.lastMove.edgeId);
-      this.lastMoveMesh.matrix.copy(edgeTransform(a, b, DRAWN_EDGE_RADIUS * 1.9));
-      (this.lastMoveMesh.material as THREE.MeshBasicMaterial).color.set(
-        PLAYER_COLORS[view.lastMove.seat],
-      );
+      const color = PLAYER_COLORS[view.lastMove.seat];
+      const [core, shell] = this.lastMoveMesh.children as [THREE.Mesh, THREE.Mesh];
+      core.matrix.copy(edgeTransform(a, b, DRAWN_EDGE_RADIUS * 1.35));
+      shell.matrix.copy(edgeTransform(a, b, DRAWN_EDGE_RADIUS * 2.8));
+      (core.material as THREE.MeshBasicMaterial).color.set('#ffffff');
+      (shell.material as THREE.MeshBasicMaterial).color.set(color);
     }
     if (!view.lastMove) this.lastMoveKey = null;
+    this.updateLastMoveVisibility();
+  }
+
+  /** The overlay follows slicing: hidden when its edge is outside the slab. */
+  private updateLastMoveVisibility(): void {
+    if (this.lastMoveKey === null) {
+      this.lastMoveMesh.visible = false;
+      return;
+    }
+    const [a, b] = this.lat.edgeEndpoints(this.lastMoveKey);
+    this.lastMoveMesh.visible = this.inSlab([a, b]);
   }
 
   /** Isolate one slab of the lattice (null = show everything). */
@@ -199,6 +212,7 @@ export class BoardRenderer {
     this.slice = slice;
     this.setHovered(null);
     this.rebuild();
+    this.updateLastMoveVisibility();
   }
 
   getSlice(): Slice | null {
@@ -272,14 +286,28 @@ export class BoardRenderer {
     return group;
   }
 
-  private buildLastMoveMesh(): THREE.Mesh {
-    const mesh = new THREE.Mesh(
+  /**
+   * Persistent last-move marker (the prototype's glowing line): a bright
+   * white-hot core over the drawn edge plus a translucent player-colored
+   * glow shell. It flashes on placement and then stays until the next
+   * move — it is how players follow what just happened.
+   */
+  private buildLastMoveMesh(): THREE.Group {
+    const group = new THREE.Group();
+    const core = new THREE.Mesh(
       new THREE.CylinderGeometry(1, 1, 1, 16),
-      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9 }),
     );
-    mesh.matrixAutoUpdate = false;
-    mesh.visible = false;
-    return mesh;
+    const shell = new THREE.Mesh(
+      new THREE.CylinderGeometry(1, 1, 1, 16),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.3, depthWrite: false }),
+    );
+    for (const m of [core, shell]) {
+      m.matrixAutoUpdate = false;
+      group.add(m);
+    }
+    group.visible = false;
+    return group;
   }
 
   private inSlab(points: Point3[]): boolean {
@@ -665,14 +693,15 @@ export class BoardRenderer {
       });
     }
 
-    // last-move glow fade
-    if (this.lastMoveKey !== null) {
+    // last-move marker: bright flash on placement settling into a steady
+    // glow (with a slow breathe) that persists until the next move
+    if (this.lastMoveMesh.visible) {
       const age = performance.now() - this.lastMoveShownAt;
-      const t = Math.max(0, 1 - age / LAST_MOVE_FADE_MS);
-      this.lastMoveMesh.visible = t > 0;
-      (this.lastMoveMesh.material as THREE.MeshBasicMaterial).opacity = 0.5 * t;
-    } else {
-      this.lastMoveMesh.visible = false;
+      const flash = Math.max(0, 1 - age / LAST_MOVE_FLASH_MS);
+      const breathe = this.reducedMotion ? 0 : 0.08 * Math.sin(performance.now() / 420);
+      const [core, shell] = this.lastMoveMesh.children as [THREE.Mesh, THREE.Mesh];
+      (core.material as THREE.MeshBasicMaterial).opacity = 0.55 + 0.4 * flash;
+      (shell.material as THREE.MeshBasicMaterial).opacity = 0.22 + 0.25 * flash + breathe;
     }
 
     this.renderer.render(this.scene, this.camera);
