@@ -2,6 +2,11 @@ name = "dots-3d-api"
 main = "src/index.ts"
 compatibility_date = "2025-06-01"
 
+[vars]
+# Origins allowed to call the API (the Pages site). Extend with the
+# *.pages.dev preview origin if you test previews against production.
+ALLOWED_ORIGINS = "https://dots-3d.com,https://www.dots-3d.com,https://dots-3d.pages.dev"
+
 [[durable_objects.bindings]]
 name = "GAME_ROOM"
 class_name = "GameRoom"

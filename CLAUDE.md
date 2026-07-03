@@ -4,215 +4,89 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Essential Commands
 
-**Development:**
 ```bash
-npm run dev          # Start dev server (auto-selects port, usually 3000 or 3001)
-npm run server       # Start WebSocket server on port 3002 (for online multiplayer)
-npm run build        # Build for production
+npm run dev          # game client (Vite) → http://localhost:3000
+npm run dev:worker   # multiplayer API (wrangler dev) → http://localhost:8787
+npm test             # run all tests (vitest, single pass)
+npm run test:watch   # vitest watch mode
+npm run typecheck    # tsc for BOTH the client project and worker/
+npm run build        # typecheck + production build to dist/
 ```
 
-**Important:** For online multiplayer, both servers must be running:
-1. `npm run dev` (game client)
-2. `npm run server` (WebSocket backend)
+Online multiplayer needs both `dev` and `dev:worker` running. Local and
+AI modes need only `dev`. The client finds the API via `VITE_API_URL`
+(defaults to `http://localhost:8787`).
 
-**Testing:**
-```bash
-npm test             # Run all tests
-npm run test:ui      # Run tests with UI
-npm run test:coverage # Run tests with coverage report
-vitest [pattern]     # Run specific test files matching pattern
-```
+## Architecture
 
-**TDD Process:**
-All development must follow Test-Driven Development methodology. See [docs/TDD-Process-Instructions.md](docs/TDD-Process-Instructions.md) for comprehensive process guidelines.
+**Dots 3D** is 3D dots-and-boxes. Rules: completing a face grants
+another turn; owning 4 of a cube's 6 faces claims the cube; the game
+ends when every edge is drawn; most cubes wins; equal cubes is a draw
+(faces split 3–3 leave a cube unclaimed).
 
-## CRITICAL TEST WRITING PRINCIPLE
+The design rests on two load-bearing ideas. Preserve them:
 
-**NEVER write tests that pass when bugs exist.** Always write tests that:
-- ✅ **PASS** when the application functions correctly
-- ❌ **FAIL** when bugs are present
+1. **One geometry oracle.** `src/engine/lattice.ts` assigns every edge,
+   face, and cube a stable integer id and precomputes all adjacency
+   (edge↔face, face↔cube). Nothing else may re-derive geometry from
+   coordinates — the previous implementation had three divergent copies
+   of "what does this move complete?" and that was the root cause of
+   its worst bugs.
 
-This means:
-- Write tests that assert correct behavior
-- Let tests fail when bugs exist, then fix the bugs to make tests pass
-- NEVER write `expect(bugExists).toBe(true)` or similar assertions
-- NEVER write tests designed to "document" bugs by passing when broken
+2. **One reducer, shared verbatim.** `src/engine/game.ts#applyMove` is
+   the only code that changes game state, and it is imported unchanged
+   by the browser and the Cloudflare worker. State is immutable; scores
+   are derived from ownership arrays, never stored. `replay()` folds a
+   move log back into exact state.
 
-Example:
-```typescript
-// ❌ WRONG - test passes when bug exists
-expect(autoplayTriggeredIncorrectly).toBe(true);
+Layout:
 
-// ✅ CORRECT - test fails when bug exists, passes when fixed
-expect(autoplayOnlyTriggersForCorrectPlayer).toBe(true);
-```
+- `src/engine/` — lattice, reducer, `analyzer.ts` (move-consequence
+  classification used by BOTH the hover preview and the AI — keep it single)
+- `src/ai/` — easy/medium/hard, all via the analyzer; deterministic
+  under an injected seeded rng
+- `src/protocol/` — wire messages shared by client and worker
+- `src/app/` — Lit components; `session.ts` routes move intent per mode;
+  `theme.ts` is the only place seat indices become colors/names
+- `src/render/` — `BoardRenderer`, a pure Three.js view over `GameState`
+- `src/net/` — WebSocket client with token reconnect and seq resync
+- `worker/` — separate deployable: `room-logic.ts` (runtime-agnostic,
+  unit-tested) wrapped by the `GameRoom` Durable Object
 
-## Core Architecture
+**Online model:** server-authoritative. Rooms persist an append-only
+move log in Durable Object storage; state is rebuilt by folding the
+reducer over the log, so eviction/hibernation lose nothing. Clients
+never apply their own moves optimistically — they send `move{seq,edgeId}`
+and apply the server's `move-applied` echo. A seq mismatch triggers a
+resync, never a divergence. Identity is a durable random token
+(localStorage) mapped to seat 0/1; a third token spectates.
 
-**Dots 3D** is a 3D version of Dots and Boxes where players compete to claim cubes by capturing their faces.
+## Development Rules
 
-### Game Engine (`src/core/GameEngine.ts`)
-Central game logic handling:
-- Turn management and move validation
-- Square completion detection (when 4 lines form a face)
-- Cube claiming logic (player needs 4/6 faces to win a cube)
-- **Critical**: Uses Set-based unique face tracking to prevent double-counting shared faces between adjacent cubes
-- Score tracking: `player.score` (cubes won) vs `player.squareCount` (faces claimed)
+**Server stays presentation-agnostic.** The wire protocol speaks seat
+indices only — no names-as-identity, no colors, no UI state. Clients
+translate seats to colors via `src/app/theme.ts` (kept in sync with
+`src/styles/tokens.css`).
 
-### 3D Visualization (`src/core/GameRenderer.ts`)
-Three.js-based renderer with:
-- Interactive 3D grid with dot-to-dot line drawing
-- Mouse controls: left-click draws lines, right-drag rotates view
-- Visual feedback: translucent squares for completed faces, spheres for cube ownership
-- Configurable square opacity via `setSquareOpacity()`
+**TDD is mandatory.** Write failing tests first, then implement. See
+[docs/TDD-Process-Instructions.md](docs/TDD-Process-Instructions.md).
+Never write a test that passes while a bug exists (no
+`expect(bugExists).toBe(true)`, no vacuous `if`-guarded assertions).
 
-### Game State Flow
+**Do not test WebGL/Three.js rendering** — the test environment
+(happy-dom) has no GL context. `BoardRenderer` stays a thin view;
+anything worth testing (geometry, consequence analysis, session logic)
+belongs in the pure modules, which are fully testable.
 
-**Mode Selection → Game Setup → Game Start:**
-1. `GameSetup` component shows three-step flow:
-   - Mode selection (Local/Single Player/Online)
-   - Game setup (grid size, player names)
-   - Waiting room (online only)
-2. `GameSetup` → emits 'gamestart' event with NetworkManager (for online)
-3. `GameBoard` orchestrates `GameEngine` + `GameRenderer` + `NetworkManager`
-4. `GameEngine.makeMove()` validates lines and updates state
-5. `GameRenderer.updateFromGameState()` syncs visuals
+**Both typechecks must pass** before work is complete:
+`npm run typecheck` covers the client project and `worker/` (which uses
+`@cloudflare/workers-types`).
 
-**Online Multiplayer Flow:**
-1. Player 1 creates room → gets shareable URL (`?room=ROOMID`)
-2. Player 2 visits URL → sees invitation with Player 1's name
-3. Player 2 joins → both receive 'game-started' event
-4. Moves sync via WebSocket through `NetworkManager`
-5. Token-based reconnection stored in localStorage
+**All tests green before committing.**
 
-### Component Architecture
-Web Components with custom events:
-- `<game-setup>` → `<game-board>` via 'gamestart' event
-- `<game-board>` manages game lifecycle and UI updates
-- Uses Shadow DOM for style isolation
+## Deployment
 
-## Key Implementation Details
-
-**Face Sharing Bug Prevention:**
-Adjacent cubes share faces. The `countUniqueFacesForPlayer()` method uses corner coordinates as Set keys to ensure each unique face is counted only once per player.
-
-**Mouse Interaction:**
-- Left mouse button: line selection/drawing
-- Right mouse button: view rotation (prevents accidental moves during rotation)
-
-**Game Modes:**
-- `'local'`: Two players on same device
-- `'ai'`: vs computer opponent (see `src/ai/AIPlayer.ts`)
-- `'online'`: multiplayer via WebSocket (`src/network/NetworkManager.ts`)
-
-**Online Multiplayer Architecture:**
-- `NetworkManager`: Handles WebSocket connection and event management
-- Room-based system with unique room IDs
-- `get-room-info` endpoint for invitation display
-- Token-based reconnection stored in localStorage
-- Event cleanup via `cleanupNetworkManager()` to prevent duplicates
-- Server runs on port 3002, client on 3000/3001
-
-**Testing Strategy:**
-- Comprehensive test coverage for game logic, line validation, scoring
-- Specific tests for edge cases like the square counting bug
-- Tests use Vitest with happy-dom environment
-- **Important**: Do not create tests that require WebGL or Three.js rendering context, as these will fail in the test environment. Focus on testing game logic, state management, and non-visual components
-
-## File Organization
-
-```
-src/
-├── core/              # Game engine, renderer, types
-├── components/        # Web Components (GameSetup, GameBoard)
-├── ai/               # AI player implementation
-├── network/          # WebSocket client for online play
-├── tests/            # Vitest test files
-└── main.ts           # App initialization
-
-server/
-└── server.ts         # Express + Socket.io server
-```
-
-Vite serves from `src/` directory, builds to `dist/`. Server runs independently for online multiplayer.
-
-## Development Guidelines
-
-### Client-Server Architecture Principle
-**CRITICAL**: The server must remain agnostic of UI design and visual representation details. Game state should be stored abstractly on the server and interpreted by clients for visual display.
-
-**DO:**
-- Server stores player IDs (e.g., 'player1', 'player2') and abstract game data
-- Client translates player IDs to colors using `PlayerColors.ts`
-- Client handles all visual styling, colors, animations, and UI decisions
-
-**DON'T:**
-- Send color values from server to client
-- Include UI-specific properties in server game state
-- Make server dependent on visual representation choices
-
-This separation ensures:
-- Server can support multiple client types (web, mobile, CLI)
-- UI changes don't require server updates
-- Game logic remains independent of presentation layer
-
-### TypeScript Build Requirement
-**CRITICAL**: The TypeScript build must always pass after making changes. Similar to tests, TypeScript errors should never be left unresolved. Always run `npx tsc --noEmit` after making changes and fix any type errors before considering the work complete.
-
-This ensures:
-- Type safety across the entire codebase
-- Early detection of interface mismatches and API changes
-- Consistent code quality and developer experience
-- Prevention of runtime errors caused by type mismatches
-
-Use `npx tsc --noEmit` to check for type errors without generating JavaScript output.
-
-### TDD Methodology - Mandatory Process
-**CRITICAL**: Always use Test-Driven Development for both new features and bug fixes. Implementation should NEVER begin without first creating failing tests.
-
-**Claude Code must follow the comprehensive TDD process documented in [docs/TDD-Process-Instructions.md](docs/TDD-Process-Instructions.md)**
-
-**Core TDD Requirements:**
-1. **Write failing tests first** - for both features and bug fixes
-2. **Follow Red-Green-Refactor cycle** strictly
-3. **Verify tests fail** before implementing solutions
-4. **Write minimal code** to make tests pass
-5. **Refactor while keeping tests green**
-
-**For New Features:**
-- Break down features into small, testable behaviors
-- Plan test structure before writing any code
-- Implement incrementally, one test at a time
-- Focus on public interfaces and behavior, not implementation
-
-**For Bug Fixes:**
-- Write failing tests that reproduce the bug
-- Verify tests fail with current broken code  
-- Fix with minimal changes to pass tests
-- Use tests as regression prevention
-
-This ensures:
-- Higher code quality through comprehensive testing
-- Better design driven by testability requirements
-- Faster debugging with immediate feedback
-- Regression prevention through automated test suites
-- Living documentation that stays current
-
-**Reference the full TDD process guide at [docs/TDD-Process-Instructions.md](docs/TDD-Process-Instructions.md) for detailed workflows, best practices, and examples.**
-
-### Testing Before Commits
-**IMPORTANT**: Always ensure all tests pass before committing code. Commits with failing tests make it difficult to use `git bisect` for debugging and can break CI/CD pipelines. Run `npm test` and fix any failures before committing.
-
-### Server Restart Rule
-**IMPORTANT**: Always restart the server (`npm run server`) after making changes to `server/server.ts`. The server maintains in-memory state for active game rooms, and old state can interfere with testing new code changes.
-
-## Production Domain
-
-**Domain**: [dots-3d.com](https://dots-3d.com)
-
-The game is deployed at dots-3d.com, providing a professional web presence for the 3D dots and boxes experience. This domain should be referenced in:
-- Production deployment configurations
-- Social sharing and marketing materials  
-- Any external documentation or references to the live game
-
-The domain name aligns with the game's "Dots 3D" branding and clearly indicates the three-dimensional nature of the gameplay.
+Cloudflare Pages (site, project `dots-3d`, domain
+[dots-3d.com](https://dots-3d.com)) + a separate Cloudflare Worker
+(`dots-3d-api`) for multiplayer. CI in `.github/workflows/deploy.yml`
+tests every push and deploys on `main`. Details: [docs/deployment.md](docs/deployment.md).
