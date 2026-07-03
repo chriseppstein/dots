@@ -70,7 +70,7 @@ export class HowToPlay extends LitElement {
       <div class="backdrop" @click=${this.onBackdrop}>
         <div class="card dialog" role="dialog" aria-modal="true" aria-label="How to play">
           <button class="btn quiet close" @click=${this.close} aria-label="Close">
-            <svg width="18" height="18" viewBox="0 0 24 24"><path d=${icons.close} /></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d=${icons.close} /></svg>
           </button>
           <h2>How to play</h2>
           <ol>

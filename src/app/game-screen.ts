@@ -337,14 +337,14 @@ export class GameScreen extends LitElement {
         <div class="turn">${this.turnText(snap)}</div>
         <div class="toolbar">
           <button class="btn" title="Slice the grid to see inside" @click=${this.cycleSlice}>
-            <svg width="16" height="16" viewBox="0 0 24 24"><path d=${icons.layers} /></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24"><path fill-rule="evenodd" d=${icons.layers} /></svg>
             ${this.sliceAxis === null ? 'Slice' : ['X', 'Y', 'Z'][this.sliceAxis]}
           </button>
           <button class="btn" title="Reset view" @click=${() => this.renderer?.resetView()}>
-            <svg width="16" height="16" viewBox="0 0 24 24"><path d=${icons.camera} /></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24"><path fill-rule="evenodd" d=${icons.camera} /></svg>
           </button>
           <button class="btn" title="How to play" @click=${() => (this.helpOpen = true)}>
-            <svg width="16" height="16" viewBox="0 0 24 24"><path d=${icons.help} /></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24"><path fill-rule="evenodd" d=${icons.help} /></svg>
           </button>
           <button class="btn" @click=${this.exit}>New game</button>
         </div>

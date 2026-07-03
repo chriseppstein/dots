@@ -4,7 +4,15 @@ import './setup-screen.ts';
 import './game-screen.ts';
 import './how-to-play.ts';
 import { GameSession } from './session.ts';
-import { NetClient, createRoom, getRoomInfo, playerToken, type ConnectionStatus } from '../net/client.ts';
+import {
+  NetClient,
+  createRoom,
+  getRoomInfo,
+  playerToken,
+  rememberRoom,
+  recallRoomName,
+  type ConnectionStatus,
+} from '../net/client.ts';
 import type { ServerMessage } from '../protocol/messages.ts';
 import type { StartDetail, InviteInfo } from './setup-screen.ts';
 import type { Seat } from '../engine/game.ts';
@@ -113,6 +121,7 @@ export class DotsApp extends LitElement {
       return;
     }
     history.replaceState(null, '', `?room=${this.roomId}`);
+    rememberRoom(this.roomId, this.myName);
     this.connect();
     this.busyText = '';
     this.shareUrl = `${location.origin}${location.pathname}?room=${this.roomId}`;
@@ -131,6 +140,17 @@ export class DotsApp extends LitElement {
     }
     this.roomId = roomId;
     this.gridSize = info.config.gridSize;
+
+    // a room we already hold a seat in (host reload, guest reconnect):
+    // skip the invitation and rejoin directly
+    const knownName = recallRoomName(roomId);
+    if (knownName) {
+      this.myName = knownName;
+      this.busyText = 'Rejoining game…';
+      this.connect();
+      return;
+    }
+
     this.invite = {
       roomId,
       hostName: info.players[0]?.name ?? 'A friend',
@@ -141,6 +161,7 @@ export class DotsApp extends LitElement {
 
   private onJoinOnline = (ev: CustomEvent<{ name: string }>) => {
     this.myName = ev.detail.name;
+    if (this.roomId) rememberRoom(this.roomId, this.myName);
     this.invite = null;
     this.busyText = 'Joining game…';
     this.connect();
@@ -191,6 +212,7 @@ export class DotsApp extends LitElement {
         this.onlineNames[msg.player.seat] = msg.player.name;
         this.opponentConnected = true;
         this.ensureOnlineSession([], true);
+        this.session?.setPlayerNames([...this.onlineNames]);
         return;
       }
       case 'player-connection': {
@@ -230,6 +252,7 @@ export class DotsApp extends LitElement {
         },
       });
     }
+    this.session.setPlayerNames([...this.onlineNames]);
     if (moves.length > 0) this.session.loadLog(moves);
     if (bothSeated) {
       this.busyText = '';

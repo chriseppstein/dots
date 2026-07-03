@@ -78,6 +78,13 @@ export class GameSession {
     return this.log.length;
   }
 
+  /** online: a player (re)joined after the session started — update HUD names. */
+  setPlayerNames(names: [string, string]): void {
+    this.opts.playerNames[0] = names[0];
+    this.opts.playerNames[1] = names[1];
+    this.emit();
+  }
+
   /** Human intent from the UI. Returns false if the move can't be made now. */
   requestMove(edgeId: number): boolean {
     if (!this.isInteractive()) return false;

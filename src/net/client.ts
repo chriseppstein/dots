@@ -43,6 +43,27 @@ export function playerToken(): string {
   return token;
 }
 
+const ROOMS_KEY = 'dots3d-rooms';
+
+/** Remember rooms this browser has a seat in, so links auto-rejoin. */
+export function rememberRoom(roomId: string, name: string): void {
+  const rooms = knownRooms();
+  rooms[roomId] = name;
+  localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms));
+}
+
+export function recallRoomName(roomId: string): string | null {
+  return knownRooms()[roomId] ?? null;
+}
+
+function knownRooms(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(ROOMS_KEY) ?? '{}') as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
 export type ConnectionStatus = 'connecting' | 'open' | 'closed';
 
 export interface NetClientOptions {

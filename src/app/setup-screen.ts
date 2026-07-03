@@ -159,7 +159,7 @@ export class SetupScreen extends LitElement {
         <div class="card">${this.renderStep()}</div>
         <div class="help-link">
           <button class="btn quiet" @click=${() => (this.helpOpen = true)}>
-            <svg width="16" height="16" viewBox="0 0 24 24"><path d=${icons.help} /></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24"><path fill-rule="evenodd" d=${icons.help} /></svg>
             How to play
           </button>
         </div>
@@ -263,7 +263,7 @@ export class SetupScreen extends LitElement {
       <div class="share">
         <input type="text" readonly .value=${this.shareUrl ?? ''} @focus=${this.selectAll} />
         <button class="btn" @click=${this.copyLink}>
-          <svg width="16" height="16" viewBox="0 0 24 24"><path d=${icons.copy} /></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24"><path fill-rule="evenodd" d=${icons.copy} /></svg>
           ${this.copied ? 'Copied!' : 'Copy'}
         </button>
       </div>

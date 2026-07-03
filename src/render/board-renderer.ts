@@ -300,7 +300,7 @@ export class BoardRenderer {
       else drawnBySeat[(owner - 1) as Seat].push(e);
     }
 
-    // undrawn edges: subtle guides + invisible fat pick targets
+    // undrawn edges: subtle guides
     if (undrawn.length > 0) {
       const guideMat = new THREE.MeshBasicMaterial({
         color: SCENE.undrawnEdge,
@@ -312,20 +312,30 @@ export class BoardRenderer {
         guideMat,
         undrawn.length,
       );
-      const picks = new THREE.InstancedMesh(
-        new THREE.CylinderGeometry(1, 1, 1, 6),
-        new THREE.MeshBasicMaterial({ visible: false }),
-        undrawn.length,
-      );
       undrawn.forEach((e, i) => {
         const [a, b] = this.lat.edgeEndpoints(e);
         guides.setMatrixAt(i, edgeTransform(a, b, EDGE_RADIUS, 0.86));
-        picks.setMatrixAt(i, edgeTransform(a, b, PICK_RADIUS, 0.9));
       });
       this.dynamic.add(guides);
+    }
+
+    // invisible fat pick targets for EVERY visible edge — drawn edges must
+    // block the ray, or a click on a drawn line would select a hidden
+    // undrawn edge behind it
+    const pickable = [...undrawn, ...drawnBySeat[0], ...drawnBySeat[1]];
+    if (pickable.length > 0) {
+      const picks = new THREE.InstancedMesh(
+        new THREE.CylinderGeometry(1, 1, 1, 6),
+        new THREE.MeshBasicMaterial({ visible: false }),
+        pickable.length,
+      );
+      pickable.forEach((e, i) => {
+        const [a, b] = this.lat.edgeEndpoints(e);
+        picks.setMatrixAt(i, edgeTransform(a, b, PICK_RADIUS, 0.9));
+      });
       this.dynamic.add(picks);
       this.pickMesh = picks;
-      this.pickEdgeIds = undrawn;
+      this.pickEdgeIds = pickable;
     }
 
     // drawn edges per seat
@@ -441,7 +451,9 @@ export class BoardRenderer {
     const hits = this.raycaster.intersectObject(this.pickMesh);
     const hit = hits[0];
     if (hit?.instanceId === undefined) return null;
-    return this.pickEdgeIds[hit.instanceId] ?? null;
+    const edgeId = this.pickEdgeIds[hit.instanceId];
+    if (edgeId === undefined || this.view!.state.edges[edgeId] !== 0) return null;
+    return edgeId;
   }
 
   private setHovered(edgeId: number | null): void {
