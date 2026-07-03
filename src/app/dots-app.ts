@@ -209,6 +209,7 @@ export class DotsApp extends LitElement {
         return;
       }
       case 'player-joined': {
+        if (msg.player.seat === this.mySeat) return; // never treat ourselves as the opponent
         this.onlineNames[msg.player.seat] = msg.player.name;
         this.opponentConnected = true;
         this.ensureOnlineSession([], true);
@@ -258,6 +259,12 @@ export class DotsApp extends LitElement {
       this.busyText = '';
       this.shareUrl = null;
       this.screen = 'game';
+    } else {
+      // seated but alone (fresh room, or the host reloaded the waiting
+      // tab): show the waiting room with the shareable link
+      this.busyText = '';
+      this.shareUrl = `${location.origin}${location.pathname}?room=${this.roomId}`;
+      this.screen = 'setup';
     }
   }
 

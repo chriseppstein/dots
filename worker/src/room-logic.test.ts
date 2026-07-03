@@ -59,6 +59,50 @@ const TOKEN_A = 'token-aaaaaaaa';
 const TOKEN_B = 'token-bbbbbbbb';
 const TOKEN_C = 'token-cccccccc';
 
+describe('broadcast exclusion under Durable Object re-wrapping', () => {
+  // The DO adapter creates a FRESH wrapper object per getWebSockets() call,
+  // so excluding "the sender" by object identity can never match. Exclusion
+  // must work by session token. Regression: the joiner received a
+  // player-joined about itself and the client started the game solo.
+  class SharedState {
+    sent: ServerMessage[] = [];
+    session: Session | null = null;
+  }
+  const rewrap = (s: SharedState): Client => ({
+    send: (msg) => s.sent.push(msg),
+    getSession: () => s.session,
+    setSession: (session) => (s.session = session),
+    close: () => {},
+  });
+
+  it('does not echo player-joined or player-connection back to the joiner', async () => {
+    const storage = new FakeStorage();
+    // connections appear as they connect, and every clients() call returns
+    // fresh wrapper objects, like the real DO
+    const states: SharedState[] = [];
+    const room = new RoomLogic(storage, () => states.map(rewrap));
+    await room.init({ gridSize: 3 });
+
+    const a = new SharedState();
+    states.push(a);
+    await room.handleMessage(rewrap(a), { type: 'join', token: TOKEN_A, name: 'Alice' });
+    expect(a.sent.filter((m) => m.type === 'player-joined')).toHaveLength(0);
+
+    const b = new SharedState();
+    states.push(b);
+    await room.handleMessage(rewrap(b), { type: 'join', token: TOKEN_B, name: 'Bob' });
+    expect(b.sent.filter((m) => m.type === 'player-joined')).toHaveLength(0);
+    expect(a.sent.filter((m) => m.type === 'player-joined')).toHaveLength(1);
+
+    // reconnect announcement must also skip the reconnector itself
+    const a2 = new SharedState();
+    states.push(a2);
+    await room.handleMessage(rewrap(a2), { type: 'join', token: TOKEN_A, name: 'Alice' });
+    expect(a2.sent.filter((m) => m.type === 'player-connection')).toHaveLength(0);
+    expect(b.sent.filter((m) => m.type === 'player-connection')).toHaveLength(1);
+  });
+});
+
 describe('joining and seats', () => {
   let s: ReturnType<typeof setup>;
   beforeEach(async () => {
@@ -97,6 +141,7 @@ describe('joining and seats', () => {
     await s.room.handleMessage(b, { type: 'join', token: TOKEN_B, name: 'Bob' });
     await s.room.handleMessage(a, { type: 'move', seq: 0, edgeId: 5 });
 
+    a.closed = true; // the runtime drops closed sockets from clients()
     await s.room.handleClose(a);
     const a2 = s.connect();
     await s.room.handleMessage(a2, { type: 'join', token: TOKEN_A, name: 'Alice' });
@@ -108,6 +153,7 @@ describe('joining and seats', () => {
     const b = s.connect();
     await s.room.handleMessage(a, { type: 'join', token: TOKEN_A, name: 'Alice' });
     await s.room.handleMessage(b, { type: 'join', token: TOKEN_B, name: 'Bob' });
+    a.closed = true; // the runtime drops closed sockets from clients()
     await s.room.handleClose(a);
     expect(b.ofType('player-connection')).toContainEqual({
       type: 'player-connection',

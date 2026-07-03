@@ -98,12 +98,17 @@ export class RoomLogic {
   async handleClose(client: Client): Promise<void> {
     const session = client.getSession();
     if (session?.seat === null || session === null) return;
-    // announce only if no other connection holds the same seat
+    // Contract: the closed socket is already absent from clients() (the DO
+    // runtime removes it before webSocketClose fires). Announce only if no
+    // other connection — e.g. a second tab — still holds the same token.
     const stillConnected = this.clients().some(
-      (c) => c !== client && c.getSession()?.token === session.token,
+      (c) => c.getSession()?.token === session.token,
     );
     if (!stillConnected) {
-      this.broadcast({ type: 'player-connection', seat: session.seat, connected: false }, client);
+      this.broadcast(
+        { type: 'player-connection', seat: session.seat, connected: false },
+        session.token,
+      );
     }
   }
 
@@ -137,12 +142,9 @@ export class RoomLogic {
 
     if (seat !== null) {
       if (existing) {
-        this.broadcast({ type: 'player-connection', seat, connected: true }, client);
+        this.broadcast({ type: 'player-connection', seat, connected: true }, token);
       } else {
-        this.broadcast(
-          { type: 'player-joined', player: { seat, name, connected: true } },
-          client,
-        );
+        this.broadcast({ type: 'player-joined', player: { seat, name, connected: true } }, token);
       }
     }
   }
@@ -182,9 +184,15 @@ export class RoomLogic {
     client.send({ type: 'moves', from, edgeIds: log.slice(from) });
   }
 
-  private broadcast(msg: ServerMessage, except?: Client): void {
+  /**
+   * Send to every connection except those holding `exceptToken`. Exclusion
+   * is by session token, never by object identity — the Durable Object
+   * adapter creates a fresh wrapper per getWebSockets() call, so identity
+   * comparison silently matches nothing.
+   */
+  private broadcast(msg: ServerMessage, exceptToken?: string): void {
     for (const c of this.clients()) {
-      if (c !== except) c.send(msg);
+      if (exceptToken === undefined || c.getSession()?.token !== exceptToken) c.send(msg);
     }
   }
 
