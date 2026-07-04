@@ -16,5 +16,8 @@
     "experimentalDecorators": true,
     "useDefineForClassFields": false
   },
-  "include": ["src", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "vite.config.ts", "vitest.config.ts"],
+  // run.ts is a Node CLI (executed via tsx) in a DOM-typed project; the
+  // simulation logic it wraps (simulate.ts) is typechecked and tested
+  "exclude": ["src/sim/run.ts"]
 }
