@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { getLattice } from '../engine/lattice.ts';
 import { newGame, applyMove, validMoves, scores, type GameState, type Seat } from '../engine/game.ts';
 import { chooseMove, seededRng, type Difficulty } from './ai.ts';
+import { analyzeAllMoves } from '../engine/analyzer.ts';
 
 // AI invariants ported from the prototype's AIPlayer spec, extended with
 // difficulty tiers. All difficulties must return legal moves; medium and
@@ -56,6 +57,31 @@ describe('medium and hard take free points and avoid giveaways', () => {
       for (let seed = 0; seed < 5; seed++) {
         const move = chooseMove(g, difficulty, seededRng(seed));
         expect(move).not.toBe(e3);
+      }
+    },
+  );
+});
+
+describe('never gives a face away for nothing', () => {
+  it.each(['medium', 'hard'] as const)(
+    '%s never plays a pure giveaway while a safe line exists',
+    (difficulty) => {
+      // property over full seeded self-play games: whenever the chosen
+      // move is classified 'danger' (exposes a face, completes nothing),
+      // there must have been no 'safe' move available
+      for (let seed = 0; seed < 5; seed++) {
+        const rng = seededRng(seed);
+        let g = newGame({ gridSize: 3 });
+        while (g.status === 'playing') {
+          const analyses = [...analyzeAllMoves(g).values()];
+          const safeExists = analyses.some((a) => a.kind === 'safe');
+          const move = chooseMove(g, difficulty, rng);
+          const chosen = analyses.find((a) => a.edgeId === move)!;
+          if (chosen.kind === 'danger') {
+            expect(safeExists).toBe(false);
+          }
+          g = play(g, [move]);
+        }
       }
     },
   );
