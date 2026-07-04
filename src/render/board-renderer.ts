@@ -11,10 +11,11 @@
  * the view a stateless function of GameState.
  *
  * Interaction: precise raycast picking against invisible fat cylinders
- * (replacing the prototype's nearest-midpoint guess). Left-drag or
- * touch-drag orbits, wheel/pinch zooms, click/tap on an edge selects it.
- * Slicing isolates one slab of the lattice so interior edges are
- * reachable — the prototype's biggest playability gap.
+ * (replacing the prototype's nearest-midpoint guess). Mouse: right-drag
+ * orbits, wheel zooms, left-click draws. Touch: one-finger drag orbits,
+ * pinch zooms, tap previews an edge, press-and-hold draws it. Slicing
+ * isolates one slab of the lattice so interior edges are reachable —
+ * the prototype's biggest playability gap.
  */
 
 import * as THREE from 'three';
@@ -63,6 +64,9 @@ const FACE_OPACITY = 0.3;
 const CUBE_OPACITY = 0.16;
 const LAST_MOVE_FLASH_MS = 900;
 const DRAG_THRESHOLD_PX = 6;
+/** Fingers wobble more than mice — a tap may drift this far. */
+const TOUCH_SLOP_PX = 12;
+const LONG_PRESS_MS = 450;
 
 const UP = new THREE.Object3D();
 
@@ -108,13 +112,15 @@ export class BoardRenderer {
   private lastViewSentAt = 0;
 
   // pointer state — mouse: right button orbits, left button only selects;
-  // touch: one finger orbits/taps, two fingers pinch-zoom
+  // touch: one-finger drag orbits, tap previews, long-press draws,
+  // two fingers pinch-zoom
   private pointers = new Map<number, { x: number; y: number }>();
   private dragging = false;
   private downPos: { x: number; y: number } | null = null;
   private rightDrag: { x: number; y: number } | null = null;
   private pinchDistance: number | null = null;
   private hoveredEdge: number | null = null;
+  private longPressTimer: ReturnType<typeof setTimeout> | null = null;
 
   // scene objects rebuilt per update
   private dynamic = new THREE.Group();
@@ -184,9 +190,12 @@ export class BoardRenderer {
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
     // the right button is the orbit control, not a context menu
     canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
-    // leaving the canvas (e.g. onto a HUD panel) must clear the hover, or
-    // the highlight and consequence chip stick to the last-touched edge
-    canvas.addEventListener('pointerleave', () => {
+    // A mouse leaving the canvas (e.g. onto a HUD panel) must clear the
+    // hover, or the highlight and chip stick to the last-touched edge.
+    // Touch pointers always "leave" on finger lift — clearing for them
+    // would erase the tap preview the instant it appears.
+    canvas.addEventListener('pointerleave', (ev) => {
+      if (ev.pointerType === 'touch') return;
       if (!this.rightDrag && !this.dragging) this.setHovered(null);
     });
 
@@ -253,6 +262,7 @@ export class BoardRenderer {
   setInputEnabled(enabled: boolean): void {
     if (enabled === this.inputEnabled) return;
     this.inputEnabled = enabled;
+    this.cancelLongPress();
     this.setHovered(null);
     this.pointers.clear();
     this.rightDrag = null;
@@ -608,12 +618,39 @@ export class BoardRenderer {
     if (this.pointers.size === 1) {
       this.downPos = { x: ev.clientX, y: ev.clientY };
       this.dragging = false;
+      // preview immediately so the player sees what a hold would draw
+      const edge = this.pick(ev.clientX, ev.clientY);
+      if (edge !== null) this.setHovered(edge);
+      // hold in place to commit the move
+      this.cancelLongPress();
+      const pointerId = ev.pointerId;
+      this.longPressTimer = setTimeout(() => {
+        this.longPressTimer = null;
+        if (this.dragging || !this.downPos) return;
+        const at = this.pointers.get(pointerId);
+        const held = at ? this.pick(at.x, at.y) : null;
+        if (held !== null) {
+          navigator.vibrate?.(30);
+          this.setHovered(null);
+          this.downPos = null;
+          this.opts.onEdgeSelect(held);
+        }
+      }, LONG_PRESS_MS);
     } else if (this.pointers.size === 2) {
       const [p1, p2] = [...this.pointers.values()];
       this.pinchDistance = Math.hypot(p1!.x - p2!.x, p1!.y - p2!.y);
-      this.downPos = null; // a second finger cancels tap-select
+      this.downPos = null; // a second finger cancels tap/long-press
+      this.cancelLongPress();
+      this.setHovered(null);
     }
   };
+
+  private cancelLongPress(): void {
+    if (this.longPressTimer !== null) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+  }
 
   private onPointerMove = (ev: PointerEvent): void => {
     if (!this.inputEnabled) return;
@@ -649,9 +686,10 @@ export class BoardRenderer {
     if (
       !this.dragging &&
       this.downPos &&
-      Math.hypot(ev.clientX - this.downPos.x, ev.clientY - this.downPos.y) > DRAG_THRESHOLD_PX
+      Math.hypot(ev.clientX - this.downPos.x, ev.clientY - this.downPos.y) > TOUCH_SLOP_PX
     ) {
       this.dragging = true;
+      this.cancelLongPress();
       this.setHovered(null);
     }
     if (this.dragging) this.orbitBy(dx, dy);
@@ -677,21 +715,14 @@ export class BoardRenderer {
       return;
     }
 
+    this.cancelLongPress();
     this.pointers.delete(ev.pointerId);
     this.pinchDistance = null;
     if (!this.dragging && this.downPos) {
+      // a short tap keeps the preview from pointerdown (or clears it when
+      // tapping empty space); drawing requires holding for LONG_PRESS_MS
       const edge = this.pick(ev.clientX, ev.clientY);
-      if (edge !== null) {
-        // touch flow: first tap previews, tap on the previewed edge confirms
-        if (this.hoveredEdge !== edge) {
-          this.setHovered(edge);
-        } else {
-          this.opts.onEdgeSelect(edge);
-          this.setHovered(null);
-        }
-      } else {
-        this.setHovered(null);
-      }
+      if (edge === null) this.setHovered(null);
     }
     this.downPos = null;
     this.dragging = false;

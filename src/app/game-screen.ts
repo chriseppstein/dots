@@ -57,11 +57,16 @@ export class GameScreen extends LitElement {
         left: 0;
         right: 0;
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         gap: var(--space-3);
         padding: var(--space-3) var(--space-4);
         pointer-events: none;
+      }
+      .toolbar {
+        flex-wrap: wrap;
+        justify-content: flex-end;
       }
       .hud > * {
         pointer-events: auto;

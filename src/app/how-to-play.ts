@@ -89,8 +89,8 @@ export class HowToPlay extends LitElement {
           <h3>Controls</h3>
           <p class="muted">
             Right-drag to spin the cube (one finger on touch), scroll or pinch to zoom. Left-click
-            a line to draw it (on touch: tap to preview, tap again to confirm). Use the slice tool
-            to see inside the grid.
+            a line to draw it (on touch: tap to preview, press and hold to draw). Use the slice
+            tool to see inside the grid.
           </p>
           <button class="btn primary" @click=${this.close}>Got it</button>
         </div>
