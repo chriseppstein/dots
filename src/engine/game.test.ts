@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getLattice } from './lattice.ts';
+import { findCompletingMove } from './analyzer.ts';
 import {
   newGame,
   applyMove,
@@ -227,11 +228,40 @@ describe('game end', () => {
     return g;
   }
 
-  it('finishes exactly when all edges are drawn', () => {
+  it('finishes when all edges are drawn OR a majority of cubes is clinched', () => {
     const lat = getLattice(3);
     const g = playOut(3);
     expect(g.status).toBe('finished');
-    expect(g.movesPlayed).toBe(lat.edgeCount);
+    expect(validMoves(g)).toHaveLength(0);
+    if (g.movesPlayed < lat.edgeCount) {
+      // mercy rule: the winner holds a strict majority no one can catch
+      expect(g.winner).not.toBeNull();
+      expect(scores(g)[g.winner!] * 2).toBeGreaterThan(lat.cubeCount);
+    } else {
+      expect([...g.faces].every((v) => v !== 0)).toBe(true);
+    }
+  });
+
+  it('ends the moment a player crosses half the cubes (mercy rule)', () => {
+    // Asymmetric playout: seat 0 always takes completions, seat 1 always
+    // refuses them. Seat 0 sweeps the cubes, so on 3³ (8 cubes) it reaches
+    // 5 well before the board fills. The game must end right there — never
+    // earlier (4 of 8 is not a majority), never later.
+    const lat = getLattice(3);
+    let g = newGame({ gridSize: 3 });
+    while (g.status === 'playing') {
+      const [a, b] = scores(g);
+      expect(a * 2).toBeLessThanOrEqual(lat.cubeCount);
+      expect(b * 2).toBeLessThanOrEqual(lat.cubeCount);
+      const completing = findCompletingMove(g);
+      const passive = validMoves(g).find((e) => e !== completing) ?? validMoves(g)[0]!;
+      g = play(g, [g.currentSeat === 0 ? (completing ?? passive) : passive]);
+    }
+    // this playout must clinch early — otherwise this test proves nothing
+    expect(g.movesPlayed).toBeLessThan(lat.edgeCount);
+    const [a, b] = scores(g);
+    expect(Math.max(a, b) * 2).toBeGreaterThan(lat.cubeCount);
+    expect(g.winner).toBe(a > b ? 0 : 1);
     expect(validMoves(g)).toHaveLength(0);
   });
 
@@ -243,18 +273,13 @@ describe('game end', () => {
     });
   });
 
-  it('the winner is the seat with strictly more cubes; equal cubes is a draw', () => {
+  it('a full-board finish scores by cube count; equal cubes is a draw', () => {
     const g = playOut(3);
     const [a, b] = scores(g);
     if (a === b) expect(g.winner).toBeNull();
     else expect(g.winner).toBe(a > b ? 0 : 1);
-  });
-
-  it('every face is owned at the end, but 3–3 cubes may be unclaimed', () => {
-    const g = playOut(3);
-    expect([...g.faces].every((v) => v !== 0)).toBe(true);
     const claimed = [...g.cubes].filter((v) => v !== 0).length;
-    expect(scores(g)[0] + scores(g)[1]).toBe(claimed);
+    expect(a + b).toBe(claimed);
     expect(claimed).toBeLessThanOrEqual(8);
   });
 });
@@ -280,5 +305,26 @@ describe('replay (move log is the source of truth)', () => {
 
   it('replay rejects an invalid log', () => {
     expect(() => replay({ gridSize: 3 }, [0, 0])).toThrow();
+  });
+
+  it('replay tolerates moves after the finish (pre-mercy-rule logs)', () => {
+    // build a log that clinches early, then append leftover valid edges
+    // the way an old-rules game would have recorded them
+    let g = newGame({ gridSize: 3 });
+    const log: number[] = [];
+    while (g.status === 'playing') {
+      const completing = findCompletingMove(g);
+      const passive = validMoves(g).find((e) => e !== completing) ?? validMoves(g)[0]!;
+      const move = g.currentSeat === 0 ? (completing ?? passive) : passive;
+      log.push(move);
+      g = play(g, [move]);
+    }
+    expect(g.movesPlayed).toBeLessThan(getLattice(3).edgeCount); // clinched early
+    const leftovers = [];
+    for (let e = 0; e < 54 && leftovers.length < 3; e++) if (g.edges[e] === 0) leftovers.push(e);
+    const replayed = replay({ gridSize: 3 }, [...log, ...leftovers]);
+    expect(replayed.status).toBe('finished');
+    expect(replayed.winner).toBe(g.winner);
+    expect(replayed.movesPlayed).toBe(g.movesPlayed);
   });
 });

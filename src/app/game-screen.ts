@@ -3,7 +3,7 @@ import { customElement, property, state, query } from 'lit/decorators.js';
 import { sharedStyles, icons } from './ui-shared.ts';
 import { BoardRenderer } from '../render/board-renderer.ts';
 import { analyzeAllMoves, type MoveAnalysis } from '../engine/analyzer.ts';
-import { scores, faceCounts, type Seat } from '../engine/game.ts';
+import { scores, faceCounts, latticeOf, type Seat } from '../engine/game.ts';
 import type { GameSession, SessionSnapshot } from './session.ts';
 import { consequenceLabel, CONSEQUENCE_COLORS } from './theme.ts';
 import type { Axis } from '../engine/lattice.ts';
@@ -31,6 +31,8 @@ export class GameScreen extends LitElement {
   @state() private sliceAxis: Axis | null = null;
   @state() private sliceLayer = 0;
   @state() private helpOpen = false;
+  /** Count of currently-safe lines, null when analyses aren't available. */
+  @state() private safeCount: number | null = null;
 
   @query('#board') private boardEl!: HTMLDivElement;
 
@@ -113,6 +115,13 @@ export class GameScreen extends LitElement {
         font-size: var(--text-xs);
         color: var(--text-faint);
       }
+      .mid {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        justify-content: center;
+      }
       .turn {
         background: var(--surface-overlay);
         border: 1px solid var(--border);
@@ -121,6 +130,32 @@ export class GameScreen extends LitElement {
         font-size: var(--text-sm);
         font-weight: 600;
         white-space: nowrap;
+      }
+      .safe-pill {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        background: var(--surface-overlay);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: var(--space-2) var(--space-4);
+        font-size: var(--text-sm);
+        font-weight: 600;
+        white-space: nowrap;
+        color: var(--text-dim);
+      }
+      .safe-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--safe);
+      }
+      .safe-pill.none {
+        color: var(--danger);
+        border-color: var(--danger);
+      }
+      .safe-pill.none .safe-dot {
+        background: var(--danger);
       }
       .toolbar {
         display: flex;
@@ -312,12 +347,18 @@ export class GameScreen extends LitElement {
   private pushToRenderer(snap: SessionSnapshot): void {
     if (!this.renderer) return;
     const playing = snap.state.status === 'playing';
+    // online needs analyses even off-turn, to color the remote hover
+    const analyses =
+      (snap.interactive || (this.online && playing)) && playing
+        ? analyzeAllMoves(snap.state)
+        : undefined;
+    this.safeCount = analyses
+      ? [...analyses.values()].filter((a) => a.kind === 'safe').length
+      : null;
     this.renderer.update({
       state: snap.state,
       interactive: snap.interactive,
-      // online needs analyses even off-turn, to color the remote hover
-      analyses:
-        (snap.interactive || (this.online && playing)) ? analyzeAllMoves(snap.state) : undefined,
+      analyses,
       lastMove: snap.lastMove,
     });
     // shared view: input follows the turn; both sides are free after the game
@@ -375,7 +416,18 @@ export class GameScreen extends LitElement {
             `,
           )}
         </div>
-        <div class="turn">${this.turnText(snap)}</div>
+        <div class="mid">
+          <div class="turn">${this.turnText(snap)}</div>
+          ${this.safeCount !== null
+            ? html`<div class="safe-pill ${this.safeCount === 0 ? 'none' : ''}"
+                title="Lines that neither score nor give your opponent a face">
+                <span class="safe-dot"></span>
+                ${this.safeCount === 0
+                  ? 'No safe lines left!'
+                  : `${this.safeCount} safe ${this.safeCount === 1 ? 'line' : 'lines'}`}
+              </div>`
+            : nothing}
+        </div>
         <div class="toolbar">
           <button class="btn" title="Slice the grid to see inside" @click=${this.cycleSlice}>
             <svg width="16" height="16" viewBox="0 0 24 24"><path fill-rule="evenodd" d=${icons.layers} /></svg>
@@ -460,7 +512,11 @@ export class GameScreen extends LitElement {
             &nbsp;·&nbsp;
             <span class="seat-1">${snap.playerNames[1]} — ${b}</span>
           </div>
-          <p class="muted">cubes claimed</p>
+          <p class="muted">
+            ${snap.state.movesPlayed < latticeOf(snap.state).edgeCount
+              ? 'cubes claimed — majority clinched, no comeback possible'
+              : 'cubes claimed'}
+          </p>
           <button class="btn primary" @click=${this.exit}>Play again</button>
         </div>
       </div>

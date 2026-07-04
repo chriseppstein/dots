@@ -105,18 +105,22 @@ export function applyMove(state: GameState, move: Move): MoveResult {
 
   const extraTurn = completedFaces.length > 0;
   const movesPlayed = state.movesPlayed + 1;
-  const finished = movesPlayed === lat.edgeCount;
 
-  let winner: Seat | null = null;
-  if (finished) {
-    let a = 0;
-    let b = 0;
-    for (const c of cubes) {
-      if (c === 1) a++;
-      else if (c === 2) b++;
-    }
-    winner = a > b ? 0 : b > a ? 1 : null;
+  let a = 0;
+  let b = 0;
+  for (const c of cubes) {
+    if (c === 1) a++;
+    else if (c === 2) b++;
   }
+  // Mercy rule: a strict majority of the cubes can never be caught, so the
+  // game ends immediately — this caps the blowout runaway where one player
+  // sweeps every remaining chain. Exactly half is not a majority (3³'s
+  // 4–4 can still end in a full-board draw). Otherwise the game runs
+  // until every edge is drawn; 3–3 cubes stay unclaimed and equal counts
+  // draw.
+  const majority = a * 2 > lat.cubeCount ? 0 : b * 2 > lat.cubeCount ? 1 : null;
+  const finished = majority !== null || movesPlayed === lat.edgeCount;
+  const winner: Seat | null = finished ? (majority ?? (a > b ? 0 : b > a ? 1 : null)) : null;
 
   return {
     ok: true,
@@ -144,6 +148,10 @@ export function applyMove(state: GameState, move: Move): MoveResult {
 export function replay(config: GameConfig, edgeIds: readonly number[]): GameState {
   let state = newGame(config);
   for (const edgeId of edgeIds) {
+    // trailing moves past the finish are ignored, not corruption: logs
+    // recorded before a rules change (e.g. the mercy rule) may legally
+    // continue past where the game now ends
+    if (state.status === 'finished') break;
     const r = applyMove(state, { edgeId, seat: state.currentSeat });
     if (!r.ok) throw new Error(`corrupt move log: edge ${edgeId} rejected (${r.error})`);
     state = r.state;
@@ -153,6 +161,7 @@ export function replay(config: GameConfig, edgeIds: readonly number[]): GameStat
 
 /** Undrawn edge ids — the legal moves for whoever is on turn. */
 export function validMoves(state: GameState): number[] {
+  if (state.status === 'finished') return [];
   const moves: number[] = [];
   for (let e = 0; e < state.edges.length; e++) {
     if (state.edges[e] === 0) moves.push(e);

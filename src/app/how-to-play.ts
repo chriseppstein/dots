@@ -77,7 +77,7 @@ export class HowToPlay extends LitElement {
             <li>Take turns drawing lines between neighboring dots.</li>
             <li>Draw the 4th side of a square to claim that <strong>face</strong> — and go again.</li>
             <li>Claim <strong>4 of the 6 faces</strong> of a small cube to win that <strong>cube</strong>.</li>
-            <li>When every line is drawn, whoever owns the most cubes wins. Faces split 3–3 leave a cube unclaimed.</li>
+            <li>Most cubes wins. Claim more than half of them and the game ends immediately — no comeback is possible. Otherwise it runs until every line is drawn (faces split 3–3 leave a cube unclaimed).</li>
           </ol>
           <h3>Line colors when you aim</h3>
           <div class="signals">

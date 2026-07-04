@@ -20,9 +20,11 @@ AI modes need only `dev`. The client finds the API via `VITE_API_URL`
 ## Architecture
 
 **Dots 3D** is 3D dots-and-boxes. Rules: completing a face grants
-another turn; owning 4 of a cube's 6 faces claims the cube; the game
-ends when every edge is drawn; most cubes wins; equal cubes is a draw
-(faces split 3–3 leave a cube unclaimed).
+another turn; owning 4 of a cube's 6 faces claims the cube; claiming a
+strict majority of the cubes ends the game immediately (mercy rule —
+the opponent can no longer catch up); otherwise the game ends when
+every edge is drawn; most cubes wins; equal cubes is a draw (faces
+split 3–3 leave a cube unclaimed).
 
 The design rests on two load-bearing ideas. Preserve them:
 
