@@ -139,10 +139,19 @@ export class GameScreen extends LitElement {
         border: 1px solid var(--border);
         border-radius: 999px;
         padding: var(--space-2) var(--space-4);
+        font: inherit;
         font-size: var(--text-sm);
         font-weight: 600;
         white-space: nowrap;
         color: var(--text-dim);
+        cursor: pointer;
+      }
+      .safe-pill:hover {
+        border-color: var(--safe);
+      }
+      .safe-pill:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
       }
       .safe-dot {
         width: 9px;
@@ -290,6 +299,7 @@ export class GameScreen extends LitElement {
     });
     this.unsubscribe = this.session.subscribe((snap) => this.onSnapshot(snap));
     this.onSnapshot(this.session.snapshot());
+    this.installConsoleApi();
   }
 
   /** Shared-view: whether this client currently drives camera + hover. */
@@ -316,6 +326,52 @@ export class GameScreen extends LitElement {
     if (this.iAmInControl()) this.renderer?.announceView();
   }
 
+  /** Flash the currently-safe lines in the scene (pill click / console). */
+  private flashSafeLines = (): void => {
+    const ids = this.currentSafeEdgeIds();
+    this.renderer?.flashEdges(ids, getComputedStyle(this).getPropertyValue('--safe') || '#34d399');
+  };
+
+  private currentSafeEdgeIds(): number[] {
+    const state = this.snap?.state;
+    if (!state || state.status !== 'playing') return [];
+    return [...analyzeAllMoves(state).values()]
+      .filter((a) => a.kind === 'safe')
+      .map((a) => a.edgeId);
+  }
+
+  /**
+   * Console debugging API, mirroring the prototype's debug affordances:
+   *   dots3d.analyze()   — counts of every move classification
+   *   dots3d.safeLines() — safe edges with their dot coordinates
+   *   dots3d.showSafe()  — flash them in the scene
+   */
+  private installConsoleApi(): void {
+    const api = {
+      analyze: () => {
+        const state = this.snap?.state;
+        if (!state || state.status !== 'playing') return 'no game in progress';
+        const counts: Record<string, number> = {};
+        for (const a of analyzeAllMoves(state).values()) counts[a.kind] = (counts[a.kind] ?? 0) + 1;
+        return counts;
+      },
+      safeLines: () => {
+        const state = this.snap?.state;
+        if (!state) return [];
+        const lat = latticeOf(state);
+        return this.currentSafeEdgeIds().map((edgeId) => {
+          const [a, b] = lat.edgeEndpoints(edgeId);
+          return { edgeId, from: `(${a.x},${a.y},${a.z})`, to: `(${b.x},${b.y},${b.z})` };
+        });
+      },
+      showSafe: () => {
+        this.flashSafeLines();
+        return `flashing ${this.currentSafeEdgeIds().length} safe line(s) for 2.5s`;
+      },
+    };
+    (window as unknown as { dots3d?: typeof api }).dots3d = api;
+  }
+
   protected updated(changed: PropertyValues): void {
     if (changed.has('online') && this.snap) this.pushToRenderer(this.snap);
   }
@@ -326,6 +382,7 @@ export class GameScreen extends LitElement {
     this.renderer?.dispose();
     this.renderer = null;
     if (this.bannerTimer) clearTimeout(this.bannerTimer);
+    delete (window as unknown as { dots3d?: unknown }).dots3d;
   }
 
   private onSnapshot(snap: SessionSnapshot): void {
@@ -419,13 +476,14 @@ export class GameScreen extends LitElement {
         <div class="mid">
           <div class="turn">${this.turnText(snap)}</div>
           ${this.safeCount !== null
-            ? html`<div class="safe-pill ${this.safeCount === 0 ? 'none' : ''}"
-                title="Lines that neither score nor give your opponent a face">
+            ? html`<button class="safe-pill ${this.safeCount === 0 ? 'none' : ''}"
+                title="Lines that neither score nor give your opponent a face — click to flash them"
+                @click=${this.flashSafeLines}>
                 <span class="safe-dot"></span>
                 ${this.safeCount === 0
                   ? 'No safe lines left!'
                   : `${this.safeCount} safe ${this.safeCount === 1 ? 'line' : 'lines'}`}
-              </div>`
+              </button>`
             : nothing}
         </div>
         <div class="toolbar">

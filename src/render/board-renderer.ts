@@ -121,6 +121,8 @@ export class BoardRenderer {
   private pinchDistance: number | null = null;
   private hoveredEdge: number | null = null;
   private longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  private flashGroup = new THREE.Group();
+  private flashTimer: ReturnType<typeof setTimeout> | null = null;
 
   // scene objects rebuilt per update
   private dynamic = new THREE.Group();
@@ -179,6 +181,7 @@ export class BoardRenderer {
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.25));
 
     this.scene.add(this.dynamic);
+    this.scene.add(this.flashGroup);
     this.hoverMesh = this.buildHoverMesh();
     this.scene.add(this.hoverMesh);
     this.lastMoveMesh = this.buildLastMoveMesh();
@@ -307,10 +310,40 @@ export class BoardRenderer {
     this.viewDirty = true;
   }
 
+  /**
+   * Temporarily highlight a set of edges (e.g. "show me the safe lines").
+   * Replaces any active flash; auto-clears after `durationMs`.
+   */
+  flashEdges(edgeIds: number[], color: string, durationMs = 2500): void {
+    this.clearFlash();
+    if (edgeIds.length === 0) return;
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 });
+    const mesh = new THREE.InstancedMesh(
+      new THREE.CylinderGeometry(1, 1, 1, 10),
+      mat,
+      edgeIds.length,
+    );
+    edgeIds.forEach((e, i) => {
+      const [a, b] = this.lat.edgeEndpoints(e);
+      mesh.setMatrixAt(i, edgeTransform(a, b, DRAWN_EDGE_RADIUS * 1.5));
+    });
+    this.flashGroup.add(mesh);
+    this.flashTimer = setTimeout(() => this.clearFlash(), durationMs);
+  }
+
+  private clearFlash(): void {
+    if (this.flashTimer) {
+      clearTimeout(this.flashTimer);
+      this.flashTimer = null;
+    }
+    this.clearGroup(this.flashGroup);
+  }
+
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.animationHandle);
     this.resizeObserver.disconnect();
+    this.clearFlash();
     this.clearGroup(this.dynamic);
     this.renderer.dispose();
     this.renderer.domElement.remove();
