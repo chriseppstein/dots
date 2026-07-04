@@ -1,8 +1,26 @@
 import { LitElement, html, css, nothing } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, state, query } from 'lit/decorators.js';
 import { sharedStyles, icons } from './ui-shared.ts';
 import type { GridSize } from '../engine/lattice.ts';
 import type { Difficulty } from '../ai/ai.ts';
+import { chooseMove, seededRng } from '../ai/ai.ts';
+import { applyMove, newGame, type GameState } from '../engine/game.ts';
+import { BoardRenderer } from '../render/board-renderer.ts';
+
+/** A believable mid-game board for the ambient backdrop: the medium AI
+ *  plays itself (seeded, so every visitor sees the same good-looking
+ *  position) until half the edges are drawn. */
+function ambientPosition(): GameState {
+  const rng = seededRng(0xd075);
+  let g = newGame({ gridSize: 4 });
+  const half = Math.floor(g.edges.length / 2);
+  while (g.movesPlayed < half && g.status === 'playing') {
+    const r = applyMove(g, { edgeId: chooseMove(g, 'medium', rng), seat: g.currentSeat });
+    if (!r.ok) break;
+    g = r.state;
+  }
+  return g;
+}
 
 export type SetupMode = 'local' | 'ai' | 'online';
 
@@ -42,17 +60,39 @@ export class SetupScreen extends LitElement {
   @state() private helpOpen = false;
   @state() private copied = false;
 
+  @query('#bg') private bgEl!: HTMLDivElement;
+  private bgRenderer: BoardRenderer | null = null;
+  private bgAnimation = 0;
+
   static styles = [
     sharedStyles,
     css`
       :host {
+        position: relative;
         display: grid;
         place-items: center;
         min-height: 100%;
         padding: var(--space-5);
+        overflow: hidden;
+      }
+      #bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        opacity: 0.5;
+      }
+      .vignette {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 0%, var(--bg) 82%);
       }
       .wrap {
         width: min(480px, 100%);
+        position: relative;
+        z-index: 2;
       }
       .title {
         text-align: center;
@@ -149,8 +189,43 @@ export class SetupScreen extends LitElement {
     `,
   ];
 
+  protected firstUpdated(): void {
+    // ambient backdrop: a slowly turning, zoomed-in view of a half-played
+    // board. Input is locked and the camera driven via the remote-view
+    // path, so this reuses the game renderer without any special mode.
+    this.bgRenderer = new BoardRenderer({
+      container: this.bgEl,
+      gridSize: 4,
+      onEdgeSelect: () => {},
+      onEdgeHover: () => {},
+    });
+    this.bgRenderer.update({ state: ambientPosition(), interactive: false, lastMove: null });
+    this.bgRenderer.setInputEnabled(false);
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const start = performance.now();
+    const drive = () => {
+      const t = (performance.now() - start) / 1000;
+      this.bgRenderer?.applyRemoteView({
+        theta: Math.PI / 4 + t * 0.06,
+        phi: Math.PI / 3 + 0.18 * Math.sin(t * 0.13),
+        distance: 3.4,
+      });
+      if (!reduced) this.bgAnimation = requestAnimationFrame(drive);
+    };
+    drive();
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    cancelAnimationFrame(this.bgAnimation);
+    this.bgRenderer?.dispose();
+    this.bgRenderer = null;
+  }
+
   render() {
     return html`
+      <div id="bg"></div>
+      <div class="vignette"></div>
       <div class="wrap">
         <div class="title">
           <h1>Dots 3D</h1>
