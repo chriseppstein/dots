@@ -3,16 +3,31 @@
  * the evaluation weights are ported from the prototype's AIPlayer, which
  * encoded sound dots-and-boxes intuition on top of a broken model.
  *
- *  - easy:   mostly random; takes an open face only half the time
- *  - medium: greedy — take points, avoid giving the third edge of a face
+ *  - easy:   takes open faces but plays randomly otherwise (gives plenty
+ *            away), and overlooks available completions ~10% of the time
+ *  - medium: greedy — take points, avoid giving the third edge of a face;
+ *            overlooks completions ~3% of the time
  *  - hard:   medium plus chain sense — values longer chains and, when
- *            forced to give something away, hands over the shortest chain
+ *            forced to give something away, hands over the shortest
+ *            chain; overlooks completions ~1% of the time
+ *
+ * The oversight rates are a deliberate game-feel feature: an attentive
+ * human can catch and punish a missed face.
  */
 
-import { analyzeMove, findCompletingMove } from '../engine/analyzer.ts';
+import { analyzeMove, findCompletingMove, findCompletingMoves } from '../engine/analyzer.ts';
 import { applyMove, validMoves, type GameState } from '../engine/game.ts';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
+
+/**
+ * Chance per decision — when a face-completing move is available — that
+ * the AI overlooks it and plays as if it weren't there. This is the
+ * "pay attention and punish it" mechanic: a missed completion is a face
+ * the human can claim next turn. The blind move still follows the normal
+ * policy, so an oversight never doubles as a deliberate chain giveaway.
+ */
+const OVERSIGHT_RATE: Record<Difficulty, number> = { easy: 0.1, medium: 0.03, hard: 0.01 };
 
 /** Deterministic rng (mulberry32) so AI behavior is reproducible in tests. */
 export function seededRng(seed: number): () => number {
@@ -30,13 +45,31 @@ export function chooseMove(
   difficulty: Difficulty,
   rng: () => number = Math.random,
 ): number {
-  const moves = validMoves(state);
+  let moves = validMoves(state);
   if (moves.length === 0) throw new Error('no legal moves: game is over');
   if (moves.length === 1) return moves[0]!;
 
+  // oversight roll: sometimes miss that completions exist at all
+  const completions = findCompletingMoves(state);
+  const canComplete = completions.length > 0;
+  if (canComplete && completions.length < moves.length && rng() < OVERSIGHT_RATE[difficulty]) {
+    const completionSet = new Set(completions);
+    moves = moves.filter((e) => !completionSet.has(e));
+    return choosePolicy(state, moves, difficulty, rng, false);
+  }
+  return choosePolicy(state, moves, difficulty, rng, canComplete);
+}
+
+function choosePolicy(
+  state: GameState,
+  moves: number[],
+  difficulty: Difficulty,
+  rng: () => number,
+  canComplete: boolean,
+): number {
   switch (difficulty) {
     case 'easy':
-      return chooseEasy(state, moves, rng);
+      return chooseEasy(state, moves, rng, canComplete);
     case 'medium':
       return chooseScored(state, moves, rng, false);
     case 'hard':
@@ -44,9 +77,16 @@ export function chooseMove(
   }
 }
 
-function chooseEasy(state: GameState, moves: number[], rng: () => number): number {
-  const completing = findCompletingMove(state);
-  if (completing !== null && rng() < 0.5) return completing;
+function chooseEasy(
+  state: GameState,
+  moves: number[],
+  rng: () => number,
+  canComplete: boolean,
+): number {
+  if (canComplete) {
+    const completing = findCompletingMove(state);
+    if (completing !== null) return completing;
+  }
   return moves[Math.floor(rng() * moves.length)]!;
 }
 

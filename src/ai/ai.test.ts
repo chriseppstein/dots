@@ -40,13 +40,20 @@ describe.each(['easy', 'medium', 'hard'] as const)('%s difficulty', (difficulty)
 describe('medium and hard take free points and avoid giveaways', () => {
   const lat = getLattice(3);
 
-  it.each(['medium', 'hard'] as const)('%s completes an available face', (difficulty) => {
-    const edges = lat.faceEdges(0);
-    const g = play(newGame({ gridSize: 3 }), edges.slice(0, 3));
-    // whoever is on turn can complete face 0
-    const move = chooseMove(g, difficulty, seededRng(3));
-    expect(move).toBe(edges[3]);
-  });
+  it.each(['medium', 'hard'] as const)(
+    '%s takes an available completion in the vast majority of decisions',
+    (difficulty) => {
+      const edges = lat.faceEdges(0);
+      const g = play(newGame({ gridSize: 3 }), edges.slice(0, 3));
+      // whoever is on turn can complete face 0; with oversight the AI may
+      // rarely miss, so assert over a batch of seeds
+      let taken = 0;
+      for (let seed = 0; seed < 40; seed++) {
+        if (chooseMove(g, difficulty, seededRng(seed)) === edges[3]) taken++;
+      }
+      expect(taken).toBeGreaterThanOrEqual(35);
+    },
+  );
 
   it.each(['medium', 'hard'] as const)(
     '%s never plays a third edge while safe moves exist',
@@ -60,6 +67,63 @@ describe('medium and hard take free points and avoid giveaways', () => {
       }
     },
   );
+});
+
+describe('oversight: the AI sometimes misses an available completion', () => {
+  // Per-decision miss rates when a face-completing move exists:
+  // easy ≈10%, medium ≈3%, hard ≈1%. Measured over seeded trials of a
+  // position with one completing move and plenty of safe alternatives;
+  // bounds are ±4 binomial standard deviations, so the test is stable.
+  const lat = getLattice(3);
+  const edges = lat.faceEdges(0);
+  const position = play(newGame({ gridSize: 3 }), edges.slice(0, 3));
+  const completing = edges[3]!;
+
+  function missRate(difficulty: Difficulty, trials: number): number {
+    let misses = 0;
+    for (let seed = 0; seed < trials; seed++) {
+      const move = chooseMove(position, difficulty, seededRng(seed));
+      if (move !== completing) {
+        misses++;
+        // an overlooked completion must not be replaced by a different
+        // scoring move or a needless giveaway
+        const a = analyzeAllMoves(position).get(move)!;
+        expect(a.completesFaces).toBe(0);
+        expect(difficulty === 'easy' || a.kind === 'safe').toBe(true);
+      }
+    }
+    return misses / trials;
+  }
+
+  it('easy misses ≈10% of completions', () => {
+    const r = missRate('easy', 1500);
+    expect(r).toBeGreaterThan(0.069);
+    expect(r).toBeLessThan(0.131);
+  });
+
+  it('medium misses ≈3% of completions', () => {
+    const r = missRate('medium', 1500);
+    expect(r).toBeGreaterThan(0.012);
+    expect(r).toBeLessThan(0.048);
+  });
+
+  it('hard misses ≈1% of completions', () => {
+    const r = missRate('hard', 3000);
+    expect(r).toBeGreaterThan(0.0027);
+    expect(r).toBeLessThan(0.0173);
+  });
+
+  it('a forced single move is never overlooked', () => {
+    // when the completing move is the only legal move there is nothing
+    // to miss — the AI must play it regardless of the oversight roll
+    let g = newGame({ gridSize: 3 });
+    while (validMoves(g).length > 1) g = play(g, [validMoves(g)[0]!]);
+    if (g.status === 'playing') {
+      for (let seed = 0; seed < 20; seed++) {
+        expect(chooseMove(g, 'easy', seededRng(seed))).toBe(validMoves(g)[0]);
+      }
+    }
+  });
 });
 
 describe('never gives a face away for nothing', () => {

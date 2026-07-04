@@ -72,7 +72,14 @@ export function analyzeAllMoves(state: GameState): Map<number, MoveAnalysis> {
 
 /** An undrawn edge that would complete ≥1 face for the mover, or null. */
 export function findCompletingMove(state: GameState): number | null {
+  const all = findCompletingMoves(state);
+  return all.length > 0 ? all[0]! : null;
+}
+
+/** Every undrawn edge that would immediately complete a face. */
+export function findCompletingMoves(state: GameState): number[] {
   const lat = latticeOf(state);
+  const found = new Set<number>();
   for (let f = 0; f < state.faces.length; f++) {
     if (state.faces[f] !== 0) continue;
     let missing = -1;
@@ -81,7 +88,7 @@ export function findCompletingMove(state: GameState): number | null {
       if (state.edges[e] !== 0) drawn++;
       else missing = e;
     }
-    if (drawn === 3) return missing;
+    if (drawn === 3) found.add(missing);
   }
-  return null;
+  return [...found];
 }
