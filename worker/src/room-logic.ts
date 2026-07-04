@@ -89,10 +89,33 @@ export class RoomLogic {
         return this.handleMove(client, msg.seq, msg.edgeId);
       case 'resync':
         return this.handleResync(client, msg.from);
+      case 'view':
+      case 'hover':
+        return this.handleSharedView(client, msg);
       case 'ping':
         client.send({ type: 'pong' });
         return;
     }
+  }
+
+  /**
+   * Shared-view sync: the player on turn drives the camera and hover for
+   * everyone. Events are ephemeral (never persisted) and silently dropped
+   * unless the sender is the seated player currently in control of a
+   * running game — off-turn players, spectators, and post-game senders
+   * are ignored rather than errored, since these fire at input rate.
+   */
+  private async handleSharedView(
+    client: Client,
+    msg: Extract<ClientMessage, { type: 'view' | 'hover' }>,
+  ): Promise<void> {
+    const session = client.getSession();
+    if (!session || session.seat === null) return;
+    const players = (await this.storage.get<StoredPlayer[]>('players')) ?? [];
+    if (players.length < 2) return;
+    const state = await this.state(await this.mustGetConfig(), await this.getLog());
+    if (state.status !== 'playing' || state.currentSeat !== session.seat) return;
+    this.broadcast({ ...msg, seat: session.seat }, session.token);
   }
 
   async handleClose(client: Client): Promise<void> {

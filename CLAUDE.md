@@ -61,6 +61,13 @@ and apply the server's `move-applied` echo. A seq mismatch triggers a
 resync, never a divergence. Identity is a durable random token
 (localStorage) mapped to seat 0/1; a third token spectates.
 
+**Shared view:** online games show both players the same board. The
+player on turn drives the camera and hover; the server relays `view`
+and `hover` messages (ephemeral, never persisted, dropped unless the
+sender is the seated player currently on turn in a running game) to
+everyone else, whose local board input is locked until control flips
+with the turn. Both sides are unlocked after the game ends.
+
 ## Development Rules
 
 **Server stays presentation-agnostic.** The wire protocol speaks seat

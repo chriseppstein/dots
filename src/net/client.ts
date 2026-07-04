@@ -120,6 +120,14 @@ export class NetClient {
     this.send({ type: 'resync', from });
   }
 
+  sendView(view: { theta: number; phi: number; distance: number }): void {
+    this.send({ type: 'view', ...view });
+  }
+
+  sendHover(edgeId: number | null): void {
+    this.send({ type: 'hover', edgeId });
+  }
+
   dispose(): void {
     this.disposed = true;
     if (this.retryHandle) clearTimeout(this.retryHandle);

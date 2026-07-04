@@ -40,11 +40,19 @@ export interface Slice {
   layer: number;
 }
 
+export interface ViewState {
+  theta: number;
+  phi: number;
+  distance: number;
+}
+
 export interface BoardRendererOptions {
   container: HTMLElement;
   gridSize: GridSize;
   onEdgeSelect: (edgeId: number) => void;
   onEdgeHover: (edgeId: number | null, analysis: MoveAnalysis | null) => void;
+  /** Fires (throttled) when the local user changes the camera. */
+  onViewChange?: (view: ViewState) => void;
 }
 
 const DOT_RADIUS = 0.07;
@@ -91,6 +99,13 @@ export class BoardRenderer {
   private distance: number;
   private thetaVel = 0;
   private phiVel = 0;
+
+  // shared-view mode: when input is disabled the camera follows
+  // remoteView (smoothed in the frame loop) instead of local input
+  private inputEnabled = true;
+  private remoteView: ViewState | null = null;
+  private viewDirty = false;
+  private lastViewSentAt = 0;
 
   // pointer state — mouse: right button orbits, left button only selects;
   // touch: one finger orbits/taps, two fingers pinch-zoom
@@ -220,11 +235,58 @@ export class BoardRenderer {
   }
 
   resetView(): void {
+    if (!this.inputEnabled) return;
     this.theta = Math.PI / 4;
     this.phi = Math.PI / 3;
     this.distance = this.frameDistance();
     this.thetaVel = 0;
     this.phiVel = 0;
+    this.viewDirty = true;
+  }
+
+  // ---- shared-view control ----
+
+  /**
+   * Enable/disable local board input. Disabled = the other player is in
+   * control: the camera follows applyRemoteView and clicks are ignored.
+   */
+  setInputEnabled(enabled: boolean): void {
+    if (enabled === this.inputEnabled) return;
+    this.inputEnabled = enabled;
+    this.setHovered(null);
+    this.pointers.clear();
+    this.rightDrag = null;
+    this.downPos = null;
+    this.dragging = false;
+    this.pinchDistance = null;
+    this.renderer.domElement.style.cursor = '';
+    if (enabled) {
+      this.remoteView = null;
+      this.thetaVel = 0;
+      this.phiVel = 0;
+    }
+  }
+
+  getView(): ViewState {
+    return { theta: this.theta, phi: this.phi, distance: this.distance };
+  }
+
+  /** Camera update from the player in control (ignored while we control). */
+  applyRemoteView(view: ViewState): void {
+    if (this.inputEnabled) return;
+    this.remoteView = view;
+  }
+
+  /** Hover highlight from the player in control (ignored while we control). */
+  applyRemoteHover(edgeId: number | null): void {
+    if (this.inputEnabled) return;
+    if (edgeId !== null && this.view?.state.edges[edgeId] !== 0) return;
+    this.setHovered(edgeId);
+  }
+
+  /** Re-announce the current view (e.g. when the opponent reconnects). */
+  announceView(): void {
+    this.viewDirty = true;
   }
 
   dispose(): void {
@@ -498,13 +560,13 @@ export class BoardRenderer {
     this.hoveredEdge = edgeId;
     if (edgeId === null) {
       this.hoverMesh.visible = false;
-      if (!this.rightDrag) this.renderer.domElement.style.cursor = '';
+      if (!this.rightDrag && this.inputEnabled) this.renderer.domElement.style.cursor = '';
       this.opts.onEdgeHover(null, null);
       return;
     }
     this.applyHoverVisual(edgeId);
     const analysis = this.view?.analyses?.get(edgeId) ?? null;
-    this.renderer.domElement.style.cursor = 'pointer';
+    if (this.inputEnabled) this.renderer.domElement.style.cursor = 'pointer';
     this.opts.onEdgeHover(edgeId, analysis);
   }
 
@@ -527,6 +589,7 @@ export class BoardRenderer {
   // ---- input ----
 
   private onPointerDown = (ev: PointerEvent): void => {
+    if (!this.inputEnabled) return;
     this.renderer.domElement.setPointerCapture(ev.pointerId);
 
     if (ev.pointerType !== 'touch') {
@@ -553,6 +616,7 @@ export class BoardRenderer {
   };
 
   private onPointerMove = (ev: PointerEvent): void => {
+    if (!this.inputEnabled) return;
     if (ev.pointerType !== 'touch') {
       if (this.rightDrag) {
         const dx = ev.clientX - this.rightDrag.x;
@@ -594,6 +658,7 @@ export class BoardRenderer {
   };
 
   private onPointerUp = (ev: PointerEvent): void => {
+    if (!this.inputEnabled) return;
     if (ev.pointerType !== 'touch') {
       if (ev.button === 2) {
         this.rightDrag = null;
@@ -640,10 +705,12 @@ export class BoardRenderer {
     this.phiVel = (-dy / rect.height) * Math.PI * 1.2;
     this.theta += this.thetaVel;
     this.phi = THREE.MathUtils.clamp(this.phi + this.phiVel, 0.15, Math.PI - 0.15);
+    this.viewDirty = true;
   }
 
   private onWheel = (ev: WheelEvent): void => {
     ev.preventDefault();
+    if (!this.inputEnabled) return;
     this.zoomBy(Math.exp(ev.deltaY * 0.001));
   };
 
@@ -651,6 +718,7 @@ export class BoardRenderer {
     const max = this.frameDistance() * 2.2;
     const min = 1.5;
     this.distance = THREE.MathUtils.clamp(this.distance * factor, min, max);
+    this.viewDirty = true;
   }
 
   // ---- frame loop ----
@@ -667,13 +735,31 @@ export class BoardRenderer {
     if (this.disposed) return;
     this.animationHandle = requestAnimationFrame(this.animate);
 
-    // orbit inertia
-    if (!this.dragging && !this.reducedMotion) {
+    if (this.remoteView && !this.inputEnabled) {
+      // follow the controlling player's camera, smoothed
+      const k = this.reducedMotion ? 1 : 0.28;
+      this.theta += (this.remoteView.theta - this.theta) * k;
+      this.phi += (this.remoteView.phi - this.phi) * k;
+      this.distance += (this.remoteView.distance - this.distance) * k;
+    } else if (!this.dragging && !this.reducedMotion) {
+      // orbit inertia
       this.thetaVel *= 0.92;
       this.phiVel *= 0.92;
       if (Math.abs(this.thetaVel) > 1e-4) this.theta += this.thetaVel;
       if (Math.abs(this.phiVel) > 1e-4) {
         this.phi = THREE.MathUtils.clamp(this.phi + this.phiVel, 0.15, Math.PI - 0.15);
+        this.viewDirty = true;
+      }
+      if (Math.abs(this.thetaVel) > 1e-4) this.viewDirty = true;
+    }
+
+    // announce local camera changes to the shared view, throttled
+    if (this.viewDirty && this.inputEnabled && this.opts.onViewChange) {
+      const now = performance.now();
+      if (now - this.lastViewSentAt > 50) {
+        this.lastViewSentAt = now;
+        this.viewDirty = false;
+        this.opts.onViewChange(this.getView());
       }
     }
 

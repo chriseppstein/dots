@@ -239,10 +239,38 @@ export class GameScreen extends LitElement {
       onEdgeHover: (edgeId, analysis) => {
         this.hoverEdge = edgeId;
         this.hover = analysis;
+        if (this.iAmInControl()) this.emitToNet('send-hover', { edgeId });
+      },
+      onViewChange: (view) => {
+        if (this.iAmInControl()) this.emitToNet('send-view', view);
       },
     });
     this.unsubscribe = this.session.subscribe((snap) => this.onSnapshot(snap));
     this.onSnapshot(this.session.snapshot());
+  }
+
+  /** Shared-view: whether this client currently drives camera + hover. */
+  private iAmInControl(): boolean {
+    return this.online !== null && (this.snap?.interactive ?? false);
+  }
+
+  private emitToNet(type: string, detail: unknown): void {
+    this.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
+  }
+
+  // ---- shared-view inputs from the server (via dots-app) ----
+
+  applyRemoteView(view: { theta: number; phi: number; distance: number }): void {
+    this.renderer?.applyRemoteView(view);
+  }
+
+  applyRemoteHover(edgeId: number | null): void {
+    this.renderer?.applyRemoteHover(edgeId);
+  }
+
+  /** Re-broadcast our camera (opponent just [re]connected). */
+  resendView(): void {
+    if (this.iAmInControl()) this.renderer?.announceView();
   }
 
   protected updated(changed: PropertyValues): void {
@@ -275,12 +303,17 @@ export class GameScreen extends LitElement {
 
   private pushToRenderer(snap: SessionSnapshot): void {
     if (!this.renderer) return;
+    const playing = snap.state.status === 'playing';
     this.renderer.update({
       state: snap.state,
       interactive: snap.interactive,
-      analyses: snap.interactive ? analyzeAllMoves(snap.state) : undefined,
+      // online needs analyses even off-turn, to color the remote hover
+      analyses:
+        (snap.interactive || (this.online && playing)) ? analyzeAllMoves(snap.state) : undefined,
       lastMove: snap.lastMove,
     });
+    // shared view: input follows the turn; both sides are free after the game
+    this.renderer.setInputEnabled(this.online === null || snap.interactive || !playing);
   }
 
   private seatIsLocal(seat: Seat): boolean {

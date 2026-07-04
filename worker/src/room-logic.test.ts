@@ -253,6 +253,63 @@ describe('moves', () => {
   });
 });
 
+describe('shared-view relay (view/hover)', () => {
+  // The player on turn drives the shared camera and hover. The server
+  // relays those events to everyone else and drops them from anyone not
+  // in control — off-turn players, spectators, or after the game ends.
+  let s: ReturnType<typeof setup>;
+  let a: FakeClient;
+  let b: FakeClient;
+  beforeEach(async () => {
+    s = setup();
+    await s.room.init({ gridSize: 3 });
+    a = s.connect();
+    b = s.connect();
+    await s.room.handleMessage(a, { type: 'join', token: TOKEN_A, name: 'Alice' });
+    await s.room.handleMessage(b, { type: 'join', token: TOKEN_B, name: 'Bob' });
+  });
+
+  it('relays view from the seat on turn to others, tagged with the seat, not echoed', async () => {
+    await s.room.handleMessage(a, { type: 'view', theta: 1.2, phi: 0.8, distance: 7 });
+    expect(b.ofType('view')).toEqual([{ type: 'view', seat: 0, theta: 1.2, phi: 0.8, distance: 7 }]);
+    expect(a.ofType('view')).toHaveLength(0);
+  });
+
+  it('relays hover (including null) from the seat on turn', async () => {
+    await s.room.handleMessage(a, { type: 'hover', edgeId: 12 });
+    await s.room.handleMessage(a, { type: 'hover', edgeId: null });
+    expect(b.ofType('hover')).toEqual([
+      { type: 'hover', seat: 0, edgeId: 12 },
+      { type: 'hover', seat: 0, edgeId: null },
+    ]);
+  });
+
+  it('drops view/hover from the seat not on turn', async () => {
+    await s.room.handleMessage(b, { type: 'view', theta: 1, phi: 1, distance: 5 });
+    await s.room.handleMessage(b, { type: 'hover', edgeId: 3 });
+    expect(a.ofType('view')).toHaveLength(0);
+    expect(a.ofType('hover')).toHaveLength(0);
+  });
+
+  it('control follows the turn: after a move, the other seat relays', async () => {
+    await s.room.handleMessage(a, { type: 'move', seq: 0, edgeId: 7 }); // turn → seat 1
+    await s.room.handleMessage(a, { type: 'view', theta: 2, phi: 1, distance: 6 }); // stale controller
+    await s.room.handleMessage(b, { type: 'view', theta: 3, phi: 1, distance: 6 }); // new controller
+    expect(b.ofType('view')).toHaveLength(0);
+    expect(a.ofType('view')).toEqual([{ type: 'view', seat: 1, theta: 3, phi: 1, distance: 6 }]);
+  });
+
+  it('spectators receive relays but cannot send them', async () => {
+    const c = s.connect();
+    await s.room.handleMessage(c, { type: 'join', token: TOKEN_C, name: 'Carol' });
+    await s.room.handleMessage(c, { type: 'view', theta: 9, phi: 1, distance: 5 });
+    expect(a.ofType('view')).toHaveLength(0);
+    expect(b.ofType('view')).toHaveLength(0);
+    await s.room.handleMessage(a, { type: 'hover', edgeId: 4 });
+    expect(c.ofType('hover')).toEqual([{ type: 'hover', seat: 0, edgeId: 4 }]);
+  });
+});
+
 describe('resync and info', () => {
   it('answers resync with all moves from the requested index', async () => {
     const s = setup();

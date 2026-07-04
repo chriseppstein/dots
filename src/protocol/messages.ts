@@ -29,7 +29,10 @@ export type ClientMessage =
   | { type: 'join'; token: string; name: string }
   | { type: 'move'; seq: number; edgeId: number }
   | { type: 'resync'; from: number }
-  | { type: 'ping' };
+  | { type: 'ping' }
+  /** Ephemeral shared-view sync — sent only by the player on turn. */
+  | { type: 'view'; theta: number; phi: number; distance: number }
+  | { type: 'hover'; edgeId: number | null };
 
 export type ServerMessage =
   | {
@@ -46,7 +49,10 @@ export type ServerMessage =
   | { type: 'move-applied'; seq: number; edgeId: number; seat: Seat }
   | { type: 'moves'; from: number; edgeIds: number[] }
   | { type: 'error'; code: ErrorCode; message: string }
-  | { type: 'pong' };
+  | { type: 'pong' }
+  /** Relayed shared-view events from the seat currently in control. */
+  | { type: 'view'; seat: Seat; theta: number; phi: number; distance: number }
+  | { type: 'hover'; seat: Seat; edgeId: number | null };
 
 export type ErrorCode =
   | 'bad-message'
@@ -80,6 +86,19 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
       return typeof m.from === 'number' && m.from >= 0 ? { type: 'resync', from: m.from } : null;
     case 'ping':
       return { type: 'ping' };
+    case 'view':
+      return Number.isFinite(m.theta) && Number.isFinite(m.phi) && Number.isFinite(m.distance)
+        ? {
+            type: 'view',
+            theta: m.theta as number,
+            phi: m.phi as number,
+            distance: m.distance as number,
+          }
+        : null;
+    case 'hover':
+      return m.edgeId === null || typeof m.edgeId === 'number'
+        ? { type: 'hover', edgeId: m.edgeId as number | null }
+        : null;
     default:
       return null;
   }

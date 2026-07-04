@@ -75,6 +75,8 @@ export class DotsApp extends LitElement {
             }
           : null}
         @exit=${this.onExit}
+        @send-view=${(ev: CustomEvent) => this.net?.sendView(ev.detail)}
+        @send-hover=${(ev: CustomEvent) => this.net?.sendHover(ev.detail.edgeId)}
       ></game-screen>`;
     }
     return html`<setup-screen
@@ -217,7 +219,11 @@ export class DotsApp extends LitElement {
         return;
       }
       case 'player-connection': {
-        if (msg.seat !== this.mySeat) this.opponentConnected = msg.connected;
+        if (msg.seat !== this.mySeat) {
+          this.opponentConnected = msg.connected;
+          // realign a (re)connecting opponent with our camera if we control it
+          if (msg.connected) this.gameScreen()?.resendView();
+        }
         return;
       }
       case 'move-applied':
@@ -225,6 +231,12 @@ export class DotsApp extends LitElement {
         return;
       case 'moves':
         this.session?.applyRemoteMoves(msg.from, msg.edgeIds);
+        return;
+      case 'view':
+        this.gameScreen()?.applyRemoteView(msg);
+        return;
+      case 'hover':
+        this.gameScreen()?.applyRemoteHover(msg.edgeId);
         return;
       case 'error':
         if (msg.code === 'not-your-turn' || msg.code === 'invalid-move') return; // benign race
@@ -266,6 +278,10 @@ export class DotsApp extends LitElement {
       this.shareUrl = `${location.origin}${location.pathname}?room=${this.roomId}`;
       this.screen = 'setup';
     }
+  }
+
+  private gameScreen(): import('./game-screen.ts').GameScreen | null {
+    return this.shadowRoot?.querySelector('game-screen') ?? null;
   }
 
   // ---- teardown ----
