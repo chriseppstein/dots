@@ -151,6 +151,12 @@ export class BoardRenderer {
     const canvas = this.renderer.domElement;
     canvas.style.display = 'block';
     canvas.style.touchAction = 'none';
+    // our long-press draws a line; suppress the browser's own long-press
+    // behaviors (element selection, iOS callout, tap highlight)
+    canvas.style.userSelect = 'none';
+    canvas.style.setProperty('-webkit-user-select', 'none');
+    canvas.style.setProperty('-webkit-touch-callout', 'none');
+    canvas.style.setProperty('-webkit-tap-highlight-color', 'transparent');
     opts.container.appendChild(canvas);
 
     this.scene.background = new THREE.Color(SCENE.background);
@@ -190,6 +196,8 @@ export class BoardRenderer {
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
     // the right button is the orbit control, not a context menu
     canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    // insurance for browsers that start a selection despite user-select
+    canvas.addEventListener('selectstart', (ev) => ev.preventDefault());
     // A mouse leaving the canvas (e.g. onto a HUD panel) must clear the
     // hover, or the highlight and chip stick to the last-touched edge.
     // Touch pointers always "leave" on finger lift — clearing for them

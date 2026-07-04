@@ -50,6 +50,9 @@ export class GameScreen extends LitElement {
       #board {
         position: absolute;
         inset: 0;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
       }
       .hud {
         position: absolute;
