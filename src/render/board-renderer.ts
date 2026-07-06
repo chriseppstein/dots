@@ -11,11 +11,13 @@
  * the view a stateless function of GameState.
  *
  * Interaction: precise raycast picking against invisible fat cylinders
- * (replacing the prototype's nearest-midpoint guess). Mouse: right-drag
- * orbits, wheel zooms, left-click draws. Touch: one-finger drag orbits,
- * pinch zooms, tap previews an edge, press-and-hold draws it. Slicing
- * isolates one slab of the lattice so interior edges are reachable —
- * the prototype's biggest playability gap.
+ * (replacing the prototype's nearest-midpoint guess). Mouse: drag with
+ * either button orbits (single-button trackpads have no reliable
+ * secondary click, and there is no API to detect one), a primary-button
+ * click within the drag threshold draws, wheel zooms. Touch: one-finger
+ * drag orbits, pinch zooms, tap previews an edge, press-and-hold draws
+ * it. Slicing isolates one slab of the lattice so interior edges are
+ * reachable — the prototype's biggest playability gap.
  */
 
 import * as THREE from 'three';
@@ -118,6 +120,8 @@ export class BoardRenderer {
   private dragging = false;
   private downPos: { x: number; y: number } | null = null;
   private rightDrag: { x: number; y: number } | null = null;
+  /** Last position while the primary button is held (click-or-drag). */
+  private leftDrag: { x: number; y: number } | null = null;
   private pinchDistance: number | null = null;
   private hoveredEdge: number | null = null;
   private longPressTimer: ReturnType<typeof setTimeout> | null = null;
@@ -277,6 +281,7 @@ export class BoardRenderer {
     this.setHovered(null);
     this.pointers.clear();
     this.rightDrag = null;
+    this.leftDrag = null;
     this.downPos = null;
     this.dragging = false;
     this.pinchDistance = null;
@@ -650,7 +655,11 @@ export class BoardRenderer {
         this.setHovered(null);
         this.renderer.domElement.style.cursor = 'grabbing';
       } else if (ev.button === 0) {
+        // primary button is click-or-drag: a release within the movement
+        // threshold draws; crossing it orbits. Keeps single-button
+        // devices (trackpads without secondary click) fully usable.
         this.downPos = { x: ev.clientX, y: ev.clientY };
+        this.leftDrag = { x: ev.clientX, y: ev.clientY };
       }
       return;
     }
@@ -701,8 +710,23 @@ export class BoardRenderer {
         const dy = ev.clientY - this.rightDrag.y;
         this.rightDrag = { x: ev.clientX, y: ev.clientY };
         this.orbitBy(dx, dy);
+      } else if (this.leftDrag) {
+        const dx = ev.clientX - this.leftDrag.x;
+        const dy = ev.clientY - this.leftDrag.y;
+        this.leftDrag = { x: ev.clientX, y: ev.clientY };
+        if (
+          !this.dragging &&
+          this.downPos &&
+          Math.hypot(ev.clientX - this.downPos.x, ev.clientY - this.downPos.y) >
+            DRAG_THRESHOLD_PX
+        ) {
+          this.dragging = true;
+          this.setHovered(null);
+          this.renderer.domElement.style.cursor = 'grabbing';
+        }
+        if (this.dragging) this.orbitBy(dx, dy);
       } else {
-        // hover follows the mouse; the left button never drags the view
+        // hover follows the mouse when no button is held
         this.setHovered(this.pick(ev.clientX, ev.clientY));
       }
       return;
@@ -745,13 +769,17 @@ export class BoardRenderer {
         this.renderer.domElement.style.cursor = '';
       } else if (ev.button === 0 && this.downPos) {
         if (
+          !this.dragging &&
           Math.hypot(ev.clientX - this.downPos.x, ev.clientY - this.downPos.y) <=
-          DRAG_THRESHOLD_PX
+            DRAG_THRESHOLD_PX
         ) {
           const edge = this.pick(ev.clientX, ev.clientY);
           if (edge !== null) this.opts.onEdgeSelect(edge);
         }
         this.downPos = null;
+        this.leftDrag = null;
+        this.dragging = false;
+        this.renderer.domElement.style.cursor = '';
       }
       return;
     }
