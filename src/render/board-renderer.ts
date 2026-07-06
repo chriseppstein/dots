@@ -811,6 +811,26 @@ export class BoardRenderer {
   private onWheel = (ev: WheelEvent): void => {
     ev.preventDefault();
     if (!this.inputEnabled) return;
+
+    // Trackpad pinch arrives as ctrl+wheel (Chrome/Firefox/Edge
+    // convention; also covers deliberate ctrl+scroll): zoom with the
+    // finer deltas pinch produces.
+    if (ev.ctrlKey) {
+      this.zoomBy(Math.exp(ev.deltaY * 0.01));
+      return;
+    }
+
+    // Shift+scroll spins the cube — the trackpad rotate option (three-
+    // finger gestures never reach the browser; the OS consumes them).
+    // Grab semantics under natural scrolling: fingers right → cube right.
+    if (ev.shiftKey) {
+      // browsers move a mouse wheel's deltaY into deltaX under shift;
+      // trackpads report both axes as-is — use whichever is present
+      this.orbitBy(-(ev.deltaX || ev.deltaY) * 2, ev.deltaX ? -ev.deltaY * 2 : 0);
+      return;
+    }
+
+    // plain scroll (two-finger or mouse wheel): zoom
     this.zoomBy(Math.exp(ev.deltaY * 0.001));
   };
 
